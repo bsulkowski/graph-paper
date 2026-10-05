@@ -11,9 +11,9 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.1';
+export const TOOL_VERSION = '1.2';
 
-export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'polar';
+export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
 export type Ink = 'grey' | 'blue' | 'green' | 'sepia';
 
@@ -31,7 +31,7 @@ export interface Settings {
   caption: boolean;
 }
 
-export const GRIDS: GridType[] = ['square', 'rect', 'tri', 'hex', 'polar'];
+export const GRIDS: GridType[] = ['square', 'rect', 'tri', 'hex', 'kagome', 'polar'];
 
 // Cell areas grow by √2: every second step doubles the area, so 25 mm² (5 mm squares)
 // and 100 mm² (1 cm squares) are both on the scale, and so are the sheets of the old generator.
@@ -42,6 +42,7 @@ export const GROUPS: Record<GridType, number[]> = {
   rect: [1, 2, 3, 4, 5, 6, 8],
   tri: [1, 2, 3, 4, 5, 6],
   hex: [1, 2, 3, 4, 5],
+  kagome: [1, 3, 5],
   polar: [4, 6, 8, 9, 12, 16, 24],
 };
 export const SECTORS = [6, 8, 10, 12, 16];
@@ -67,7 +68,7 @@ export const INKS: Record<Ink, { minor: string; major: string }> = {
   sepia: { minor: '#d8c3a8', major: '#8b5e3c' },
 };
 
-const GROUP_DEFAULT: Record<GridType, number> = { square: 6, rect: 4, tri: 5, hex: 4, polar: 8 };
+const GROUP_DEFAULT: Record<GridType, number> = { square: 6, rect: 4, tri: 5, hex: 4, kagome: 3, polar: 8 };
 
 export const DEFAULTS: Settings = {
   grid: 'square',
@@ -154,7 +155,7 @@ export function settingsQuery(s: Settings): string {
   return p.toString();
 }
 
-export const turnable = (grid: GridType) => grid === 'rect' || grid === 'tri' || grid === 'hex';
+export const turnable = (grid: GridType) => grid === 'rect' || grid === 'tri' || grid === 'hex' || grid === 'kagome';
 
 /** Area as written in the sheet name and the link: whole mm², or two digits below 10 (6.3, 8.8). */
 export function areaLabel(area: number): string {
@@ -462,6 +463,61 @@ function hexagonal(box: Box, area: number, k: number): Raw | null {
 }
 
 /**
+ * Kagome (trihexagonal) grid: regular hexagons with a triangle at each corner, every line
+ * running straight across the page. It is three families of parallel lines like the triangular
+ * grid, one of them moved by half the spacing, so no three lines meet in a point. The area is
+ * that of the hexagon (the same hexagon as in the hexagonal grid); each triangle is a sixth of it.
+ * Lines run from margin to margin, so cells at the edge are cut; counts are of whole hexagons.
+ * The larger cell: every k-th line (k odd), chosen so the dark lines form a kagome k times as
+ * large, centred on the page like the small one, with a hexagon in the middle.
+ */
+function kagome(box: Box, area: number, k: number): Raw | null {
+  const a = Math.sqrt(2 * area / (3 * SQRT3));
+  const d = a * SQRT3;  // spacing of the lines in each family
+  const fitsHex = (cx: number, cy: number, side: number) =>
+    Math.abs(cx) + side <= box.hw + EPS && Math.abs(cy) + SQRT3 / 2 * side <= box.hh + EPS;
+  // Hexagon centres: a triangular lattice with spacing 2·side, one at the origin (flat-topped).
+  const countHexes = (side: number) => {
+    let n = 0;
+    const J = Math.ceil(box.hh / (SQRT3 * side)) + 1;
+    for (let j = -J; j <= J; j++) {
+      const I = Math.ceil(box.hw / (2 * side)) + Math.abs(j) + 1;
+      for (let i = -I; i <= I; i++) if (fitsHex(2 * side * i + side * j, SQRT3 * side * j, side)) n++;
+    }
+    return n;
+  };
+  const majors = countHexes(k * a), cells = countHexes(a);
+  if (majors < 1) return null;
+
+  const minor: Seg[] = [], major: Seg[] = [];
+  const reach = Math.hypot(box.hw, box.hh);
+  for (const angle of [Math.PI / 2, Math.PI / 2 + 2 * Math.PI / 3, Math.PI / 2 + 4 * Math.PI / 3]) {
+    const nx = Math.cos(angle), ny = Math.sin(angle);  // normal of the family
+    const tx = -ny, ty = nx;                           // direction of its lines
+    const I = Math.ceil(reach / d) + 1;
+    for (let i = -I; i <= I; i++) {
+      const c = d * (i + 0.5);                         // lines halfway: a hexagon at the origin
+      const px = nx * c, py = ny * c;
+      // Clip the line to the box: the range of t where px + t·tx, py + t·ty stays inside.
+      let t0 = -Infinity, t1 = Infinity;
+      for (const [p, dir, lim] of [[px, tx, box.hw], [py, ty, box.hh]]) {
+        if (Math.abs(dir) < 1e-12) {
+          if (Math.abs(p) > lim) { t0 = 1; t1 = 0; }
+          continue;
+        }
+        const ta = (-lim - p) / dir, tb = (lim - p) / dir;
+        t0 = Math.max(t0, Math.min(ta, tb));
+        t1 = Math.min(t1, Math.max(ta, tb));
+      }
+      if (t1 - t0 < 1e-6) continue;
+      const isMajor = k > 1 && mod(i - (k - 1) / 2, k) === 0;
+      (isMajor ? major : minor).push([px + t0 * tx, py + t0 * ty, px + t1 * tx, py + t1 * ty]);
+    }
+  }
+  return { minor, major, majors, cells, perMajor: k * k };
+}
+
+/**
  * Rings of the polar grid. Radii in units where R² counts small cells times area/π, so a ring
  * from `from` to `to` holds `to − from` cells. Each ring is cut into `sectors` cells; the count
  * may only change where it divides the cells so far, and must divide one larger ring
@@ -599,7 +655,7 @@ export function cellSides(s: Pick<Settings, 'grid' | 'area' | 'turn'>): { a: num
     return s.turn ? { a: h, b: w } : { a: w, b: h };
   }
   if (s.grid === 'tri') return { a: 2 * Math.sqrt(A / SQRT3) };
-  if (s.grid === 'hex') return { a: Math.sqrt(2 * A / (3 * SQRT3)) };
+  if (s.grid === 'hex' || s.grid === 'kagome') return { a: Math.sqrt(2 * A / (3 * SQRT3)) };
   return { a: Math.sqrt(A) };
 }
 
@@ -612,6 +668,7 @@ export function plural(lang: Lang, n: number): number {
 }
 
 const GRID_NAMES: Record<GridType, string> = {
+  kagome: 'kagome',
   square: 'square', rect: 'rectangular', tri: 'triangular', hex: 'hexagonal', polar: 'polar',
 };
 
@@ -631,6 +688,7 @@ export function buildGrid(s: Settings): Grid {
     raw = squareLike(frame, Math.sqrt(s.area / Math.SQRT2), Math.sqrt(s.area * Math.SQRT2), s.group);
   } else if (s.grid === 'tri') raw = triangular(frame, s.area, s.group);
   else if (s.grid === 'hex') raw = hexagonal(frame, s.area, s.group);
+  else if (s.grid === 'kagome') raw = kagome(frame, s.area, s.group);
   else if (s.part === 3) raw = polarThird(frame, s.area, s.sectors, s.group);
   else raw = polar(frame, s.area, s.sectors, s.group);
 

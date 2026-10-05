@@ -164,6 +164,41 @@ test('the ⅓ sector: name, edge along the page, three of them make the circle',
   assert.ok(wide.extent[2] - wide.extent[0] > wide.extent[3] - wide.extent[1]);
 });
 
+test('kagome: hexagons with triangles, every line straight across', () => {
+  const g = sheet({ grid: 'kagome', area: area(50), group: 3 });
+  assert.equal(g.name, 'kagome_grid_71x9x50mm2');
+  // The hexagon has the area of the setting, as in the hexagonal grid.
+  assert.ok(Math.abs(3 * Math.sqrt(3) / 2 * g.cell.a ** 2 - area(50)) < 1e-9);
+  // Lines run from margin to margin: every segment ends on the edge of the grid area.
+  const hw = g.width / 2 - DEFAULTS.margin, hh = g.height / 2 - DEFAULTS.margin;
+  const segs = (g.minor + g.major).match(/M[^M]+/g)!.map((m) => m.slice(1).split(/[ L]/).map(Number));
+  const onEdge = (x: number, y: number) => Math.abs(Math.abs(x) - hw) < 1e-3 || Math.abs(Math.abs(y) - hh) < 1e-3;
+  for (const [x1, y1, x2, y2] of segs) assert.ok(onEdge(x1, y1) && onEdge(x2, y2), `${x1},${y1} – ${x2},${y2}`);
+  // No three lines meet in a point (that would be the triangular grid).
+  const meet = new Map<string, number>();
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      const [ax, ay, bx, by] = segs[i], [cx, cy, dx, dy] = segs[j];
+      const den = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+      if (Math.abs(den) < 1e-9) continue;
+      const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / den;
+      const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / den;
+      if (t < 1e-9 || t > 1 - 1e-9 || u < 1e-9 || u > 1 - 1e-9) continue;
+      const key = `${Math.round((ax + t * (bx - ax)) * 100)},${Math.round((ay + t * (by - ay)) * 100)}`;
+      meet.set(key, (meet.get(key) ?? 0) + 1);
+    }
+  }
+  assert.ok(meet.size > 100);
+  for (const [at, pairs] of meet) assert.equal(pairs, 1, `more than two lines meet at ${at}`);
+  // A hexagon sits in the middle of the page: the lines nearest the centre are half a spacing away.
+  const d = g.cell.a * Math.sqrt(3);
+  const horizontal = segs.filter(([, y1, , y2]) => Math.abs(y1 - y2) < 1e-6).map(([, y]) => Math.abs(y));
+  assert.ok(Math.abs(Math.min(...horizontal) - d / 2) < 1e-3);
+  // Turned: the hexagons stand on a corner, so one family of lines is vertical.
+  const turned = sheet({ grid: 'kagome', area: area(50), group: 3, turn: true });
+  assert.ok(/M(-?[\d.]+) (-?[\d.]+)L\1 /.test(turned.minor + turned.major));
+});
+
 test('small cells fill whole larger ones (square, rect, tri)', () => {
   for (const grid of ['square', 'rect', 'tri'] as GridType[]) {
     for (const group of GROUPS[grid]) {
@@ -188,6 +223,7 @@ test('settings survive the link', () => {
     { ...DEFAULTS, grid: 'rect', area: area(800), group: 2, turn: true },
     { ...DEFAULTS, grid: 'polar', part: 3, sectors: 4, group: 8, area: area(100) },
     { ...DEFAULTS, grid: 'polar', part: 3, sectors: 6, group: 16, landscape: true },
+    { ...DEFAULTS, grid: 'kagome', area: area(25), group: 5, turn: true, paper: 'a3' },
   ];
   for (const s of samples) assert.deepEqual(parseSettings(new URLSearchParams(settingsQuery(s))), s);
   // Areas are written rounded in the link and read back as the nearest step.
@@ -215,6 +251,12 @@ test('unknown link parameters fall back to defaults', () => {
   assert.deepEqual(s, DEFAULTS);
   assert.equal(parseSettings(new URLSearchParams('grid=tri&group=6')).group, 6);
   assert.equal(parseSettings(new URLSearchParams('grid=hex&group=6')).group, groupFor('hex', 6));
+});
+
+test('switching to kagome keeps k only if it is odd and offered', () => {
+  assert.equal(groupFor('kagome', 3, 'hex'), 3);
+  assert.equal(groupFor('kagome', 6, 'square'), 3);
+  assert.equal(groupFor('kagome', 1, 'tri'), 1);
 });
 
 test('switching grids keeps k × k, but not into or out of polar', () => {

@@ -1,6 +1,6 @@
 {
   "name": "graph-paper",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Printable grid paper — square, rectangular, triangular, hexagonal and polar — with cells measured by area, drawn as SVG.",
   "license": "MIT",
   "author": "Bartosz Sułkowski (https://bsulkowski.pl)",

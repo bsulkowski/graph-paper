@@ -10,6 +10,7 @@ const sheets: Partial<Settings>[] = [
   { grid: 'rect', area: 50, group: 4 },
   { grid: 'tri', area: 25, group: 5 },
   { grid: 'hex', area: 50, group: 4 },
+  { grid: 'kagome', area: 50, group: 3 },
   { grid: 'polar', area: 100, group: 8, sectors: 12 },
   { grid: 'polar', part: 3, area: 100, group: 8, sectors: 4 },
 ];

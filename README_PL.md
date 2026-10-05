@@ -20,11 +20,21 @@ bez linijki — a siatka wypełnia kartkę całymi dużymi polami.
 | Prostokątna | prostokąt o bokach 1 : √2, jak kartka A | *k* × *k* prostokątów |
 | Trójkątna | trójkąt równoboczny | trójkąt o boku *k*, złożony z *k*² komórek |
 | Sześciokątna | sześciokąt foremny | sześciokąt o *k*² razy większym polu, ze środkiem w środku małego |
+| Kagome | sześciokąt foremny, w każdym rogu trójkąt o szóstej części jego pola | co *k*-ta linia (*k* = 3 albo 5): ten sam wzór *k* razy większy |
 | Biegunowa | wycinek pierścienia, wszędzie o tym samym polu | *g* komórek; liczbę dużych pól w pierścieniu ustawia się osobno |
 | Biegunowa, ⅓ koła | to samo, na wycinku 120° | to samo; liczba dużych pól dotyczy łuku wycinka |
 
 Sześciokątów nie da się złożyć z sześciokątów, więc obrys dużego sześciokąta przecina małe
 komórki: pokazuje skalę, a nie grupę całych komórek.
+
+Kagome (siatka trójheksagonalna) to siatka trójkątna, w której jedną z trzech rodzin linii
+przesunięto o pół odstępu: żadne trzy linie już się nie spotykają, więc każde skrzyżowanie
+rozchyla się w mały trójkąt, a między trójkątami powstają sześciokąty. Wszystkie linie biegną
+na przestrzał przez całą kartkę, co przydaje się w ornamentach i gwiazdach, plecionkach
+i haftach oraz na planszach, gdzie sześciokąty są polami, a trójkąty skrzyżowaniami. Pole
+dotyczy sześciokąta, więc przy tym samym ustawieniu sześciokąty są takie jak w siatce
+sześciokątnej. Inaczej niż w pozostałych siatkach linie biegną od marginesu do marginesu,
+a komórki przy brzegu są ucięte; nazwa arkusza liczy całe sześciokąty.
 
 W siatce biegunowej każda komórka ma to samo pole, od środka aż po brzeg. Liczba wycinków
 rośnie na zewnątrz skokami, tam gdzie komórki zrobiłyby się za szerokie, a okręgi i promienie
@@ -58,6 +68,7 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.2** — siatka kagome (`grid=kagome`).
 - **1.1** — siatka biegunowa na jednej trzeciej koła (`part=3`).
 - **1.0** — pierwsza wersja.
 

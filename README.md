@@ -19,11 +19,21 @@ without a ruler, and the grid fills the page with whole larger cells.
 | Rectangular | a rectangle with sides 1 : √2, like an A sheet | *k* × *k* rectangles |
 | Triangular | an equilateral triangle | a triangle with side *k*, made of *k*² cells |
 | Hexagonal | a regular hexagon | a hexagon with *k*² times the area, centred on a small one |
+| Kagome | a regular hexagon, with a triangle of a sixth of its area at each corner | every *k*-th line (*k* = 3 or 5): the same pattern *k* times larger |
 | Polar | a piece of a ring, the same area everywhere | *g* cells; how many larger cells make a ring is set separately |
 | Polar, ⅓ of a circle | the same, on a 120° sector | the same; the count is along the arc of the sector |
 
 Hexagons do not tile into hexagons, so the outline of a larger hexagon crosses small cells:
 it shows the scale rather than a group of whole cells.
+
+Kagome (trihexagonal) is the triangular grid with one of its three families of lines moved
+by half the spacing: no three lines meet any more, so every crossing opens into a small
+triangle and hexagons appear between them. Every line runs straight across the page, which
+makes it good for ornaments and star patterns, weaving and embroidery, and boards where the
+hexagons are spaces and the triangles junctions. The area is that of the hexagon, so the
+hexagons are those of the hexagonal grid at the same setting. Unlike the other grids, the
+lines run from margin to margin and the cells at the edge are cut; the sheet name counts
+whole hexagons.
 
 In the polar grid every cell has the same area, from the centre to the edge. The number of
 sectors grows outward in steps, wherever the cells would otherwise get too wide, and the
@@ -77,6 +87,7 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.2** — the kagome grid (`grid=kagome`).
 - **1.1** — the polar grid on a third of the circle (`part=3`).
 - **1.0** — the first version.
 
