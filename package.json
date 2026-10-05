@@ -1,0 +1,27 @@
+{
+  "name": "graph-paper",
+  "version": "1.0.0",
+  "description": "Printable grid paper — square, rectangular, triangular, hexagonal and polar — with cells measured by area, drawn as SVG.",
+  "license": "MIT",
+  "author": "Bartosz Sułkowski (https://bsulkowski.pl)",
+  "homepage": "https://bsulkowski.pl/graph-paper",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bsulkowski/graph-paper.git"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/graph-paper.ts"
+  },
+  "types": "./src/graph-paper.ts",
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/graph-paper.test.ts",
+    "examples": "node --experimental-strip-types scripts/examples.ts"
+  }
+}
