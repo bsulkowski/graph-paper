@@ -20,6 +20,7 @@ without a ruler, and the grid fills the page with whole larger cells.
 | Triangular | an equilateral triangle | a triangle with side *k*, made of *k*² cells |
 | Hexagonal | a regular hexagon | a hexagon with *k*² times the area, centred on a small one |
 | Polar | a piece of a ring, the same area everywhere | *g* cells; how many larger cells make a ring is set separately |
+| Polar, ⅓ of a circle | the same, on a 120° sector | the same; the count is along the arc of the sector |
 
 Hexagons do not tile into hexagons, so the outline of a larger hexagon crosses small cells:
 it shows the scale rather than a group of whole cells.
@@ -28,13 +29,21 @@ In the polar grid every cell has the same area, from the centre to the edge. The
 sectors grows outward in steps, wherever the cells would otherwise get too wide, and the
 circles and spokes of the larger cells always run along those of the small ones.
 
+The polar grid can also be drawn on a third of the circle. A 120° sector with one straight edge
+along the long side of the page is the largest piece of a circle a sheet holds: on A4 it has
+about a quarter more room than the whole circle. Its lines are those of the whole circle with
+three times as many larger cells, so three sheets put together make one circle about 37 cm
+across, and a single sheet rolls into a cone. It also suits diagrams that widen from one point,
+such as a fan chart of ancestors, read with the sheet turned.
+
 The area grows by √2 per step, from 6.25 to 800 mm², so every second step doubles it:
 25 mm² is the usual 5 mm square, 100 mm² the 1 cm square.
 
 ## Sheet names
 
 Every sheet has a name such as `square_grid_24x36x50mm2`: the grid, the number of larger cells
-on the sheet, the cells in each of them and the area of one cell. It is printed in the bottom
+on the sheet, the cells in each of them and the area of one cell. The polar grid on a third of
+the circle is called `sector_grid_…`. It is printed in the bottom
 left corner and used as the file name.
 
 Ready-made A4 sheets are in [`examples/`](examples).
@@ -67,6 +76,9 @@ today opens the same grid later. A new option comes as a new parameter whose def
 what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
+
+- **1.1** — the polar grid on a third of the circle (`part=3`).
+- **1.0** — the first version.
 
 ## Tests
 

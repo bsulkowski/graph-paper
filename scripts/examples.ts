@@ -11,6 +11,7 @@ const sheets: Partial<Settings>[] = [
   { grid: 'tri', area: 25, group: 5 },
   { grid: 'hex', area: 50, group: 4 },
   { grid: 'polar', area: 100, group: 8, sectors: 12 },
+  { grid: 'polar', part: 3, area: 100, group: 8, sectors: 4 },
 ];
 
 const dir = new URL('../examples/', import.meta.url);

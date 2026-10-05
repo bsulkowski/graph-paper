@@ -21,6 +21,7 @@ bez linijki — a siatka wypełnia kartkę całymi dużymi polami.
 | Trójkątna | trójkąt równoboczny | trójkąt o boku *k*, złożony z *k*² komórek |
 | Sześciokątna | sześciokąt foremny | sześciokąt o *k*² razy większym polu, ze środkiem w środku małego |
 | Biegunowa | wycinek pierścienia, wszędzie o tym samym polu | *g* komórek; liczbę dużych pól w pierścieniu ustawia się osobno |
+| Biegunowa, ⅓ koła | to samo, na wycinku 120° | to samo; liczba dużych pól dotyczy łuku wycinka |
 
 Sześciokątów nie da się złożyć z sześciokątów, więc obrys dużego sześciokąta przecina małe
 komórki: pokazuje skalę, a nie grupę całych komórek.
@@ -29,6 +30,13 @@ W siatce biegunowej każda komórka ma to samo pole, od środka aż po brzeg. Li
 rośnie na zewnątrz skokami, tam gdzie komórki zrobiłyby się za szerokie, a okręgi i promienie
 dużych pól zawsze biegną po liniach małych.
 
+Siatkę biegunową można też narysować na jednej trzeciej koła. Wycinek 120° z prostym bokiem
+wzdłuż dłuższej krawędzi kartki to największy kawałek koła, jaki mieści się na arkuszu: na A4
+ma o mniej więcej jedną czwartą więcej miejsca niż całe koło. Linie są te same co w całym kole
+z trzy razy większą liczbą dużych pól, więc trzy kartki złożone razem dają jedno koło
+o średnicy około 37 cm, a pojedynczą da się zwinąć w stożek. Pasuje też do diagramów, które
+rozszerzają się od jednego punktu, jak wachlarz przodków — czytany przy obróconej kartce.
+
 Pole rośnie o √2 na krok, od 6,25 do 800 mm², więc co drugi krok się podwaja: 25 mm² to zwykła
 kratka 5 mm, 100 mm² — kratka 1 cm.
 
@@ -36,7 +44,7 @@ kratka 5 mm, 100 mm² — kratka 1 cm.
 
 Każdy arkusz ma nazwę w rodzaju `square_grid_24x36x50mm2`: rodzaj siatki, liczba dużych pól
 na kartce, liczba komórek w każdym z nich i pole jednej komórki. Drukuje się w lewym dolnym
-rogu i służy za nazwę pliku.
+rogu i służy za nazwę pliku. Siatka biegunowa na jednej trzeciej koła nazywa się `sector_grid_…`.
 
 Gotowe arkusze A4 są w katalogu [`examples/`](examples).
 
@@ -49,6 +57,9 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 **Zgodność:** nazwy i znaczenie parametrów linku się nie zmieniają, więc zapisany dziś link
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
+
+- **1.1** — siatka biegunowa na jednej trzeciej koła (`part=3`).
+- **1.0** — pierwsza wersja.
 
 ## Licencja
 

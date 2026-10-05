@@ -11,7 +11,7 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.0';
+export const TOOL_VERSION = '1.1';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
@@ -21,7 +21,8 @@ export interface Settings {
   grid: GridType;
   area: number;      // mm² of one small cell, a value of AREAS
   group: number;     // larger cell: k × k small cells (square, rect, tri, hex) or g cells (polar)
-  sectors: number;   // polar: larger cells in one ring
+  sectors: number;   // polar: larger cells in one ring (in its third for part 3)
+  part: number;      // polar: 1 = the whole circle, 3 = a third of it (a 120° sector)
   turn: boolean;     // rect, tri, hex: rotated by 90°
   paper: Paper;
   landscape: boolean;
@@ -44,6 +45,11 @@ export const GROUPS: Record<GridType, number[]> = {
   polar: [4, 6, 8, 9, 12, 16, 24],
 };
 export const SECTORS = [6, 8, 10, 12, 16];
+export const PARTS = [1, 3];
+// Larger cells along the arc of a third: 4 there is 12 around the whole circle.
+export const SECTORS_THIRD = [2, 3, 4, 6, 8];
+const SECTORS_DEFAULT: Record<number, number> = { 1: 12, 3: 4 };
+export const sectorsOf = (part: number) => (part === 3 ? SECTORS_THIRD : SECTORS);
 
 export const PAPERS: Record<Paper, { label: string; width: number; height: number }> = {
   a4: { label: 'A4', width: 210, height: 297 },
@@ -68,6 +74,7 @@ export const DEFAULTS: Settings = {
   area: 50,
   group: 6,
   sectors: 12,
+  part: 1,
   turn: false,
   paper: 'a4',
   landscape: false,
@@ -93,6 +100,15 @@ export function groupFor(grid: GridType, group: number, from: GridType = grid): 
   return same && GROUPS[grid].includes(group) ? group : GROUP_DEFAULT[grid];
 }
 
+/**
+ * Larger cells in a ring when switching between the circle and its third: the same spacing
+ * if that count is offered (12 around the circle = 4 along a third), else the default.
+ */
+export function sectorsFor(part: number, sectors: number, from: number = part): number {
+  const carried = from === part ? sectors : from === 1 ? sectors / 3 : sectors * 3;
+  return sectorsOf(part).includes(carried) ? carried : SECTORS_DEFAULT[part];
+}
+
 /** Reads settings from link parameters; anything missing or unknown falls back to the default. */
 export function parseSettings(params: URLSearchParams): Settings {
   const s: Settings = { ...DEFAULTS };
@@ -106,8 +122,9 @@ export function parseSettings(params: URLSearchParams): Settings {
   if (area !== null) s.area = nearest(AREAS, area, true);
   const group = num('group');
   s.group = group !== null && GROUPS[s.grid].includes(group) ? group : GROUP_DEFAULT[s.grid];
+  s.part = params.get('part') === '3' ? 3 : 1;
   const sectors = num('sectors');
-  if (sectors !== null && SECTORS.includes(sectors)) s.sectors = sectors;
+  s.sectors = sectors !== null && sectorsOf(s.part).includes(sectors) ? sectors : SECTORS_DEFAULT[s.part];
   const paper = params.get('paper');
   if (paper && paper in PAPERS) s.paper = paper as Paper;
   const margin = num('margin');
@@ -126,7 +143,8 @@ export function settingsQuery(s: Settings): string {
   if (s.grid !== DEFAULTS.grid) p.set('grid', s.grid);
   if (s.area !== DEFAULTS.area) p.set('area', areaLabel(s.area));
   if (s.group !== GROUP_DEFAULT[s.grid]) p.set('group', String(s.group));
-  if (s.grid === 'polar' && s.sectors !== DEFAULTS.sectors) p.set('sectors', String(s.sectors));
+  if (s.grid === 'polar' && s.part === 3) p.set('part', '3');
+  if (s.grid === 'polar' && s.sectors !== SECTORS_DEFAULT[s.part]) p.set('sectors', String(s.sectors));
   if (s.turn && turnable(s.grid)) p.set('turn', '1');
   if (s.paper !== DEFAULTS.paper) p.set('paper', s.paper);
   if (s.landscape) p.set('landscape', '1');
@@ -248,6 +266,7 @@ interface Raw {
   major: Seg[] | number[][];
   minorCircles?: number[];
   majorCircles?: number[];
+  arcs?: { minor: number[]; major: number[]; a0: number; span: number };  // radii of arcs around the origin
   chained?: boolean;
   majors: number;
   cells: number;
@@ -512,6 +531,57 @@ function polar(box: Box, area: number, M: number, g: number): Raw | null {
   };
 }
 
+/**
+ * The polar grid on a third of the circle (120°). Rings and spokes as on a circle with three
+ * times as many larger cells, so the zones follow the same rule. One straight edge runs along
+ * the long side of the page: the sector is 1.5 R long that way and R across, which fits nearly
+ * the largest sector a sheet can hold (the best tilt gains about 1.5% and looks crooked).
+ */
+function polarThird(box: Box, area: number, M: number, g: number): Raw | null {
+  const span = 2 * Math.PI / 3;
+  const along = Math.min(2 * box.hw, 2 * box.hh / 1.5);   // straight edge vertical
+  const across = Math.min(2 * box.hw / 1.5, 2 * box.hh);  // straight edge horizontal
+  const a0 = along >= across ? -Math.PI / 2 : -2 * Math.PI / 3;
+  const rmax = Math.max(along, across);
+  const P = 3 * M * g;  // cells in a larger ring of the whole circle; a third of them is drawn
+  const J = Math.floor(Math.PI * rmax * rmax / (P * area) + 1e-9);
+  if (J < 1) return null;
+  const rings = polarRings(3 * M, g, J);
+  const rad = (B: number) => Math.sqrt(B * area / Math.PI);
+  const at = (r: number, angle: number): [number, number] => [r * Math.cos(angle), r * Math.sin(angle)];
+
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const spokes = new Map<string, { angle: number; parts: [number, number][] }>();
+  for (const ring of rings) {
+    const n = ring.sectors / 3;
+    for (let a = 1; a < n; a++) {
+      if ((a * M) % n === 0) continue;  // a major spoke
+      const d = gcd(a, n);
+      const id = `${a / d}/${n / d}`;
+      let spoke = spokes.get(id);
+      if (!spoke) spokes.set(id, (spoke = { angle: a0 + span * a / n, parts: [] }));
+      const last = spoke.parts[spoke.parts.length - 1];
+      if (last && last[1] === ring.from) last[1] = ring.to; else spoke.parts.push([ring.from, ring.to]);
+    }
+  }
+  const minor: Seg[] = [];
+  for (const { angle, parts } of spokes.values()) {
+    for (const [b0, b1] of parts) minor.push([...at(rad(b0), angle), ...at(rad(b1), angle)]);
+  }
+  const outer = rad(J * P);
+  const major: Seg[] = Array.from({ length: M + 1 }, (_, a) => [0, 0, ...at(outer, a0 + span * a / M)] as Seg);
+  return {
+    minor, major,
+    arcs: {
+      minor: rings.filter((ring) => ring.to % P !== 0).map((ring) => rad(ring.to)),
+      major: Array.from({ length: J }, (_, j) => rad((j + 1) * P)),
+      a0, span,
+    },
+    majors: J * M, cells: J * M * g, perMajor: g,
+    rings: mergeZones(rings).map((z) => ({ from: rad(z.from), to: rad(z.to), sectors: z.sectors / 3 })),
+  };
+}
+
 function mergeZones(rings: { from: number; to: number; sectors: number }[]) {
   const zones: typeof rings = [];
   for (const ring of rings) {
@@ -561,10 +631,12 @@ export function buildGrid(s: Settings): Grid {
     raw = squareLike(frame, Math.sqrt(s.area / Math.SQRT2), Math.sqrt(s.area * Math.SQRT2), s.group);
   } else if (s.grid === 'tri') raw = triangular(frame, s.area, s.group);
   else if (s.grid === 'hex') raw = hexagonal(frame, s.area, s.group);
+  else if (s.part === 3) raw = polarThird(frame, s.area, s.sectors, s.group);
   else raw = polar(frame, s.area, s.sectors, s.group);
 
   const perMajor = s.grid === 'polar' ? s.group : s.group * s.group;
-  const name = (majors: number) => `${GRID_NAMES[s.grid]}_grid_${majors}x${perMajor}x${areaLabel(s.area)}mm2`;
+  const kind = s.grid === 'polar' && s.part === 3 ? 'sector' : GRID_NAMES[s.grid];
+  const name = (majors: number) => `${kind}_grid_${majors}x${perMajor}x${areaLabel(s.area)}mm2`;
   if (!raw) {
     return {
       width, height, minor: '', major: '', name: name(0), majors: 0, cells: 0, perMajor,
@@ -586,6 +658,15 @@ export function buildGrid(s: Settings): Grid {
     const r = Math.max(...raw.majorCircles);
     x0 = Math.min(x0, -r); x1 = Math.max(x1, r); y0 = Math.min(y0, -r); y1 = Math.max(y1, r);
   }
+  if (raw.arcs?.major.length) {
+    // The outer arc reaches furthest where it crosses an axis.
+    const { a0, span } = raw.arcs;
+    const r = Math.max(...raw.arcs.major);
+    for (let q = Math.ceil(a0 / (Math.PI / 2) - 1e-9); q * Math.PI / 2 <= a0 + span + 1e-9; q++) {
+      const x = r * Math.cos(q * Math.PI / 2), y = r * Math.sin(q * Math.PI / 2);
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+  }
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   const place = (pts: number[]) => {
     const out = new Array<number>(pts.length);
@@ -596,8 +677,17 @@ export function buildGrid(s: Settings): Grid {
     return out;
   };
   const draw = (lines: number[][]) => (raw!.chained ? polyPath(lines.map(place)) : segPath(lines.map(place) as Seg[]));
-  const minor = draw(raw.minor as number[][]) + circlePath(raw.minorCircles ?? []);
-  const major = draw(raw.major as number[][]) + circlePath(raw.majorCircles ?? []);
+  const arcs = (radii: number[] = []) => {
+    if (!raw!.arcs) return '';
+    const { a0, span } = raw!.arcs;
+    return radii.map((r) => {
+      const [xa, ya] = place([r * Math.cos(a0), r * Math.sin(a0)]);
+      const [xb, yb] = place([r * Math.cos(a0 + span), r * Math.sin(a0 + span)]);
+      return `M${fmt(xa)} ${fmt(ya)}A${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(xb)} ${fmt(yb)}`;
+    }).join('');
+  };
+  const minor = draw(raw.minor as number[][]) + circlePath(raw.minorCircles ?? []) + arcs(raw.arcs?.minor);
+  const major = draw(raw.major as number[][]) + circlePath(raw.majorCircles ?? []) + arcs(raw.arcs?.major);
   const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
   const extent: Grid['extent'] = turn ? [-hy, -hx, hy, hx] : [-hx, -hy, hx, hy];
 
