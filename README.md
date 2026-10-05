@@ -55,7 +55,8 @@ settingsQuery(settings);                  // 'grid=hex&group=3&landscape=1' — 
 parseSettings(new URLSearchParams('grid=hex&group=3&landscape=1'));  // the same settings back
 ```
 
-Install from GitHub: `npm install github:bsulkowski/graph-paper#v1.0.0`. The package ships
+Install from GitHub: `npm install github:bsulkowski/graph-paper`, or with `#<commit>` at the end
+to pin a version. The package ships
 the TypeScript source, so a bundler has to compile it (Vite does; in an Astro or Vite SSR
 build, add `graph-paper` to `ssr.noExternal`).
 
