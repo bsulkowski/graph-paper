@@ -19,9 +19,15 @@ without a ruler, and the grid fills the page with whole larger cells.
 | Rectangular | a rectangle with sides 1 : √2, like an A sheet | *k* × *k* rectangles |
 | Triangular | an equilateral triangle | a triangle with side *k*, made of *k*² cells |
 | Hexagonal | a regular hexagon | a hexagon with *k*² times the area, centred on a small one |
-| Kagome | a regular hexagon, with a triangle of a sixth of its area at each corner | every *k*-th line (*k* = 3 or 5): the same pattern *k* times larger |
+| Kagome | a regular hexagon, with a triangle of a sixth of its area at each corner | every *k*-th line (*k* odd, up to 9): the same pattern *k* times larger |
 | Polar | a piece of a ring, the same area everywhere | *g* cells; how many larger cells make a ring is set separately |
 | Polar, ⅓ of a circle | the same, on a 120° sector | the same; the count is along the arc of the sector |
+
+For the other grids *k* goes from 1 to 10. Turning the paper turns the grid with it: a landscape
+sheet of tall rectangles is a portrait sheet of wide ones, seen from the side.
+
+Larger triangles held to the rest by one side only would stick out as sharp teeth, so they are
+left off, in the triangular grid and in kagome alike; the edge keeps only blunt corners.
 
 Hexagons do not tile into hexagons, so the outline of a larger hexagon crosses small cells:
 it shows the scale rather than a group of whole cells.
@@ -34,6 +40,8 @@ hexagons are spaces and the triangles junctions. The area is that of the hexagon
 hexagons are those of the hexagonal grid at the same setting. As everywhere else the sheet
 holds whole larger cells — the large hexagons that fit and the large triangles beside them —
 so the edge has the notches of their outline.
+
+The polar grid is **experimental**: its drawing and link parameters may still change.
 
 In the polar grid every cell has the same area, from the centre to the edge. The number of
 sectors grows outward in steps, wherever the cells would otherwise get too wide, and the
@@ -89,6 +97,9 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.4** — larger cells from 1 to 10 (kagome: odd, up to 9); a colour of one's own for the
+  lines (`ink=1f3a7a`); no more turning the grid on the page (`turn=1` from an older link turns
+  the paper instead); larger triangles held by one side only are left off.
 - **1.3** — cell areas from Human Scale Numbers, 1 mm² to 10 cm² (an `area` from an older link
   is read as the nearest value); the kagome grid holds whole larger cells like the others.
 - **1.2** — the kagome grid (`grid=kagome`).

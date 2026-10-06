@@ -20,9 +20,15 @@ bez linijki — a siatka wypełnia kartkę całymi dużymi polami.
 | Prostokątna | prostokąt o bokach 1 : √2, jak kartka A | *k* × *k* prostokątów |
 | Trójkątna | trójkąt równoboczny | trójkąt o boku *k*, złożony z *k*² komórek |
 | Sześciokątna | sześciokąt foremny | sześciokąt o *k*² razy większym polu, ze środkiem w środku małego |
-| Kagome | sześciokąt foremny, w każdym rogu trójkąt o szóstej części jego pola | co *k*-ta linia (*k* = 3 albo 5): ten sam wzór *k* razy większy |
+| Kagome | sześciokąt foremny, w każdym rogu trójkąt o szóstej części jego pola | co *k*-ta linia (*k* nieparzyste, do 9): ten sam wzór *k* razy większy |
 | Biegunowa | wycinek pierścienia, wszędzie o tym samym polu | *g* komórek; liczbę dużych pól w pierścieniu ustawia się osobno |
 | Biegunowa, ⅓ koła | to samo, na wycinku 120° | to samo; liczba dużych pól dotyczy łuku wycinka |
+
+W pozostałych siatkach *k* wynosi od 1 do 10. Obrócenie kartki obraca siatkę razem z nią:
+kartka pozioma z wysokimi prostokątami to kartka pionowa z szerokimi, oglądana z boku.
+
+Duże trójkąty trzymające się reszty tylko jednym bokiem sterczałyby jak ostre zęby, więc się
+ich nie rysuje — w siatce trójkątnej i w kagome; na brzegu zostają tylko tępe narożniki.
 
 Sześciokątów nie da się złożyć z sześciokątów, więc obrys dużego sześciokąta przecina małe
 komórki: pokazuje skalę, a nie grupę całych komórek.
@@ -35,6 +41,8 @@ i haftach oraz na planszach, gdzie sześciokąty są polami, a trójkąty skrzy�
 dotyczy sześciokąta, więc przy tym samym ustawieniu sześciokąty są takie jak w siatce
 sześciokątnej. Jak wszędzie, na kartce są całe duże pola — duże sześciokąty, które się
 mieszczą, i duże trójkąty obok nich — więc brzeg ma załamania ich obrysu.
+
+Siatka biegunowa jest **eksperymentalna**: jej rysunek i parametry linku mogą się jeszcze zmienić.
 
 W siatce biegunowej każda komórka ma to samo pole, od środka aż po brzeg. Liczba wycinków
 rośnie na zewnątrz skokami, tam gdzie komórki zrobiłyby się za szerokie, a okręgi i promienie
@@ -70,6 +78,9 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.4** — duże pole od 1 do 10 (kagome: nieparzyste, do 9); własny kolor linii
+  (`ink=1f3a7a`); bez obracania siatki na kartce (`turn=1` ze starszego linku obraca kartkę);
+  bez dużych trójkątów trzymających się jednym bokiem.
 - **1.3** — pole komórki ze skali Human Scale Numbers, od 1 mm² do 10 cm² (`area` ze starszego
   linku czyta się jako najbliższą wartość); siatka kagome z całymi dużymi polami jak pozostałe.
 - **1.2** — siatka kagome (`grid=kagome`).

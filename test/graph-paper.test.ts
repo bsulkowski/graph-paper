@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AREAS, DEFAULTS, GRIDS, GROUPS, MARGINS, PAPERS, SECTORS, SECTORS_THIRD,
-  buildGrid, groupFor, parseSettings, polarRings, renderSheet, sectorsFor, settingsQuery,
+  buildGrid, groupFor, inkColors, parseSettings, polarRings, renderSheet, sectorsFor, settingsQuery,
   type GridType, type Paper, type Settings,
 } from '../src/graph-paper.ts';
 
@@ -133,20 +133,22 @@ const variants: { label: string; grid: GridType; extra: Partial<Settings> }[] = 
 for (const { label: variant, grid, extra } of variants) {
   test(`${variant}: every area and larger cell stays within the margin`, () => {
     const cases: Partial<Settings>[] = [];
-    for (const a of AREAS) for (const group of GROUPS[grid]) cases.push({ area: a, group });
-    // Paper, orientation, direction and margin on a few sizes; small cells on large paper are slow.
+    // Every area with a few larger cells, every larger cell with a few areas (all of both is slow).
+    const groups = GROUPS[grid];
+    const someGroups = [groups[0], groups[Math.floor(groups.length / 2)], groups[groups.length - 1]];
+    for (const a of AREAS) for (const group of someGroups) cases.push({ area: a, group });
+    for (const group of groups) for (const a of [4, 32, 250]) cases.push({ area: a, group });
+    // Paper, orientation and margin on a few sizes; small cells on large paper are slow.
     for (const paper of papers) {
       for (const landscape of [false, true]) {
-        for (const turn of [false, true]) {
-          cases.push({ paper, landscape, turn, area: area(50), group: GROUPS[grid][1], margin: MARGINS[landscape ? 1 : 0] });
-          cases.push({ paper, landscape, turn, area: area(200), group: GROUPS[grid][2] });
-        }
+        cases.push({ paper, landscape, area: area(50), group: groups[1], margin: MARGINS[landscape ? 1 : 0] });
+        cases.push({ paper, landscape, area: area(200), group: groups[2] });
       }
     }
     for (const c of cases) {
       const s: Settings = { ...DEFAULTS, ...c, ...extra, grid };
       const g = buildGrid(s);
-      const label = `${variant} ${s.paper}${s.landscape ? ' landscape' : ''}${s.turn ? ' turned' : ''} ${s.area.toFixed(1)} mm² /${s.group}`;
+      const label = `${variant} ${s.paper}${s.landscape ? ' landscape' : ''} ${s.area.toFixed(1)} mm² /${s.group}`;
       if (!g.fits) {
         assert.equal(g.minor + g.major, '', label);
         continue;
@@ -211,9 +213,25 @@ test('kagome: hexagons with triangles, whole larger cells, no three lines in a p
   }
   assert.ok(meet.size > 100);
   for (const [at, pairs] of meet) assert.equal(pairs, 1, `more than two lines meet at ${at}`);
-  // Turned: the hexagons stand on a corner, so one family of lines is vertical.
-  const turned = sheet({ grid: 'kagome', area: area(50), group: 3, turn: true });
-  assert.ok(/M(-?[\d.]+) (-?[\d.]+)L\1 /.test(turned.minor + turned.major));
+  // No sharp teeth: a corner of the outline where exactly two dark lines end, with no other dark
+  // line through it, is a corner of the outline; at a lone large triangle it would be 60°.
+  const ends = new Map<string, { x: number; y: number; dirs: number[] }>();
+  for (const [x1, y1, x2, y2] of major) {
+    for (const [x, y, ox, oy] of [[x1, y1, x2, y2], [x2, y2, x1, y1]]) {
+      const id = `${Math.round(x * 20)},${Math.round(y * 20)}`;
+      const e = ends.get(id) ?? { x, y, dirs: [] };
+      e.dirs.push(Math.atan2(oy - y, ox - x));
+      ends.set(id, e);
+    }
+  }
+  let corners = 0;
+  for (const { x, y, dirs } of ends.values()) {
+    if (dirs.length !== 2 || major.some((m) => onSeg(x, y, m) && !(Math.hypot(m[0] - x, m[1] - y) < 1e-2 || Math.hypot(m[2] - x, m[3] - y) < 1e-2))) continue;
+    corners++;
+    const angle = Math.abs(((dirs[0] - dirs[1] + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+    assert.ok(Math.abs(angle - Math.PI / 3) > 1e-3, `a sharp 60° tooth at ${x}, ${y}`);
+  }
+  assert.ok(corners > 4);
 });
 
 test('small cells fill whole larger ones (square, rect, tri)', () => {
@@ -234,13 +252,13 @@ test('too large a cell gives no grid, not an error', () => {
 test('settings survive the link', () => {
   assert.equal(settingsQuery(DEFAULTS), '');
   const samples: Settings[] = [
-    { ...DEFAULTS, grid: 'hex', area: area(12.5), group: 3, turn: true, paper: 'a3', landscape: true, ink: 'green', margin: 15, caption: false },
+    { ...DEFAULTS, grid: 'hex', area: area(12.5), group: 3, paper: 'a3', landscape: true, ink: 'green', margin: 15, caption: false },
     { ...DEFAULTS, grid: 'polar', area: area(35), group: 12, sectors: 10, ink: 'blue' },
     { ...DEFAULTS, grid: 'tri', area: area(6.25), group: 1, paper: 'letter' },
-    { ...DEFAULTS, grid: 'rect', area: area(800), group: 2, turn: true },
+    { ...DEFAULTS, grid: 'rect', area: area(800), group: 2, ink: '1f3a7a' },
     { ...DEFAULTS, grid: 'polar', part: 3, sectors: 4, group: 8, area: area(100) },
     { ...DEFAULTS, grid: 'polar', part: 3, sectors: 6, group: 16, landscape: true },
-    { ...DEFAULTS, grid: 'kagome', area: area(25), group: 5, turn: true, paper: 'a3' },
+    { ...DEFAULTS, grid: 'kagome', area: area(25), group: 7, paper: 'a3' },
   ];
   for (const s of samples) assert.deepEqual(parseSettings(new URLSearchParams(settingsQuery(s))), s);
   // Areas are written rounded in the link and read back as the nearest step.
@@ -263,11 +281,33 @@ test('the ⅓ sector in the link', () => {
   for (const n of SECTORS) assert.ok(sectorsFor(1, n, 1) === n);
 });
 
+test('links from before 1.4: a turned grid becomes turned paper', () => {
+  assert.equal(parseSettings(new URLSearchParams('grid=tri&turn=1')).landscape, true);
+  assert.equal(parseSettings(new URLSearchParams('grid=tri&turn=1&landscape=1')).landscape, false);
+});
+
+test('a colour of ones own: minor lines half-way to white', () => {
+  assert.deepEqual(inkColors('1f3a7a'), { major: '#1f3a7a', minor: '#8f9dbd' });
+  assert.equal(parseSettings(new URLSearchParams('ink=%231F3A7A')).ink, '1f3a7a');
+  assert.equal(parseSettings(new URLSearchParams('ink=red')).ink, DEFAULTS.ink);
+  assert.ok(renderSheet({ ...DEFAULTS, ink: 'c0ffee' }).includes('stroke="#c0ffee"'));
+});
+
+test('triangles: no larger triangle held by one side only', () => {
+  for (const landscape of [false, true]) {
+    for (const group of [1, 3, 5]) {
+      const g = sheet({ grid: 'tri', area: area(50), group, landscape });
+      // Cells per larger one stay whole; the count drops a little against an unpruned sheet.
+      assert.equal(g.cells, g.majors * group * group);
+    }
+  }
+});
+
 test('unknown link parameters fall back to defaults', () => {
-  const s = parseSettings(new URLSearchParams('grid=spiral&area=-3&group=7&paper=b5&ink=red&margin=3'));
+  const s = parseSettings(new URLSearchParams('grid=spiral&area=-3&group=11&paper=b5&ink=red&margin=3'));
   assert.deepEqual(s, DEFAULTS);
   assert.equal(parseSettings(new URLSearchParams('grid=tri&group=6')).group, 6);
-  assert.equal(parseSettings(new URLSearchParams('grid=hex&group=6')).group, groupFor('hex', 6));
+  assert.equal(parseSettings(new URLSearchParams('grid=kagome&group=6')).group, groupFor('kagome', 6));
 });
 
 test('switching to kagome keeps k only if it is odd and offered', () => {
@@ -278,7 +318,8 @@ test('switching to kagome keeps k only if it is odd and offered', () => {
 
 test('switching grids keeps k × k, but not into or out of polar', () => {
   assert.equal(groupFor('tri', 4, 'square'), 4);
-  assert.equal(groupFor('hex', 6, 'square'), groupFor('hex', 0));
+  assert.equal(groupFor('hex', 6, 'square'), 6);
+  assert.equal(groupFor('kagome', 6, 'square'), groupFor('kagome', 0));
   assert.equal(groupFor('polar', 4, 'hex'), 8);
   assert.equal(groupFor('square', 8, 'polar'), groupFor('square', 0));
 });

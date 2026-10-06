@@ -11,11 +11,12 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.3';
+export const TOOL_VERSION = '1.4';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
-export type Ink = 'grey' | 'blue' | 'green' | 'sepia';
+export type Preset = 'grey' | 'blue' | 'green' | 'sepia';
+export type Ink = Preset | string;  // a preset, or a colour of one's own as six hex digits (1f3a7a)
 
 export interface Settings {
   grid: GridType;
@@ -23,7 +24,6 @@ export interface Settings {
   group: number;     // larger cell: k × k small cells (square, rect, tri, hex) or g cells (polar)
   sectors: number;   // polar: larger cells in one ring (in its third for part 3)
   part: number;      // polar: 1 = the whole circle, 3 = a third of it (a 120° sector)
-  turn: boolean;     // rect, tri, hex: rotated by 90°
   paper: Paper;
   landscape: boolean;
   margin: number;    // mm, on every side; the caption sits inside the bottom margin
@@ -39,12 +39,14 @@ export const GRIDS: GridType[] = ['square', 'rect', 'tri', 'hex', 'kagome', 'pol
 const HSN = [1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8];
 export const AREAS: number[] = [1, 10, 100].flatMap((m) => HSN.map((v) => Number((v * m).toPrecision(4)))).concat(1000);
 
+// The larger cell: how many times its side is the small one's (polar: cells in it).
+const UP_TO_10 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const GROUPS: Record<GridType, number[]> = {
-  square: [1, 2, 3, 4, 5, 6, 8, 10],
-  rect: [1, 2, 3, 4, 5, 6, 8],
-  tri: [1, 2, 3, 4, 5, 6],
-  hex: [1, 2, 3, 4, 5],
-  kagome: [1, 3, 5],
+  square: UP_TO_10,
+  rect: UP_TO_10,
+  tri: UP_TO_10,
+  hex: UP_TO_10,
+  kagome: [1, 3, 5, 7, 9],
   polar: [4, 6, 8, 9, 12, 16, 24],
 };
 export const SECTORS = [6, 8, 10, 12, 16];
@@ -63,12 +65,20 @@ export const PAPERS: Record<Paper, { label: string; width: number; height: numbe
 export const MARGINS = [7, 10, 15, 20];
 
 // Minor and major line colours; grey is the one of the old sheets.
-export const INKS: Record<Ink, { minor: string; major: string }> = {
+export const INKS: Record<Preset, { minor: string; major: string }> = {
   grey: { minor: '#bbbbbb', major: '#777777' },
   blue: { minor: '#a3b6de', major: '#4d6aae' },
   green: { minor: '#a9d0b0', major: '#4f8c5d' },
   sepia: { minor: '#d8c3a8', major: '#8b5e3c' },
 };
+
+/** Major and minor colours: a preset's pair, or one's own colour with the minor lines half-way to white. */
+export function inkColors(ink: Ink): { minor: string; major: string } {
+  if (ink in INKS) return INKS[ink as Preset];
+  const c = /^[0-9a-f]{6}$/i.test(ink) ? ink.toLowerCase() : '777777';
+  const minor = [0, 2, 4].map((i) => Math.round((parseInt(c.slice(i, i + 2), 16) + 255) / 2).toString(16).padStart(2, '0')).join('');
+  return { minor: `#${minor}`, major: `#${c}` };
+}
 
 const GROUP_DEFAULT: Record<GridType, number> = { square: 6, rect: 4, tri: 5, hex: 4, kagome: 3, polar: 8 };
 
@@ -78,7 +88,6 @@ export const DEFAULTS: Settings = {
   group: 6,
   sectors: 12,
   part: 1,
-  turn: false,
   paper: 'a4',
   landscape: false,
   margin: 7,
@@ -132,10 +141,10 @@ export function parseSettings(params: URLSearchParams): Settings {
   if (paper && paper in PAPERS) s.paper = paper as Paper;
   const margin = num('margin');
   if (margin !== null && MARGINS.includes(margin)) s.margin = margin;
-  const ink = params.get('ink');
-  if (ink && ink in INKS) s.ink = ink as Ink;
-  s.turn = params.get('turn') === '1';
-  s.landscape = params.get('landscape') === '1';
+  const ink = params.get('ink')?.replace(/^#/, '');
+  if (ink && (ink in INKS || /^[0-9a-f]{6}$/i.test(ink))) s.ink = ink.toLowerCase();
+  // Before 1.4 a grid could be turned on the page; turning the page instead draws the same.
+  s.landscape = (params.get('landscape') === '1') !== (params.get('turn') === '1');
   s.caption = params.get('caption') !== '0';
   return s;
 }
@@ -148,7 +157,6 @@ export function settingsQuery(s: Settings): string {
   if (s.group !== GROUP_DEFAULT[s.grid]) p.set('group', String(s.group));
   if (s.grid === 'polar' && s.part === 3) p.set('part', '3');
   if (s.grid === 'polar' && s.sectors !== SECTORS_DEFAULT[s.part]) p.set('sectors', String(s.sectors));
-  if (s.turn && turnable(s.grid)) p.set('turn', '1');
   if (s.paper !== DEFAULTS.paper) p.set('paper', s.paper);
   if (s.landscape) p.set('landscape', '1');
   if (s.margin !== DEFAULTS.margin) p.set('margin', String(s.margin));
@@ -157,7 +165,6 @@ export function settingsQuery(s: Settings): string {
   return p.toString();
 }
 
-export const turnable = (grid: GridType) => grid === 'rect' || grid === 'tri' || grid === 'hex' || grid === 'kagome';
 
 /** Area as written in the sheet name and the link: whole mm², or two digits below 10 (6.3, 8.8). */
 export function areaLabel(area: number): string {
@@ -307,6 +314,28 @@ function bestPlacement<T>(steps: number, count: (u: number, v: number) => { n: n
   return best ? best.keep : null;
 }
 
+// Larger triangles held to the rest by one side only stick out as sharp teeth: drop them,
+// again until none is left (dropping one can expose another). Up (I, J) shares its sides with
+// down (I, J−1), (I−1, J) and (I, J); down (I, J) with up (I, J), (I+1, J) and (I, J+1).
+function pruneTriangles(list: [number, number, 0 | 1][]): [number, number, 0 | 1][] {
+  const key = (I: number, J: number, kind: number) => `${I},${J},${kind}`;
+  const kept = new Set(list.map(([I, J, kind]) => key(I, J, kind)));
+  const sides = ([I, J, kind]: [number, number, 0 | 1]) => (kind === 0
+    ? [key(I, J - 1, 1), key(I - 1, J, 1), key(I, J, 1)]
+    : [key(I, J, 0), key(I + 1, J, 0), key(I, J + 1, 0)]);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const t of list) {
+      const id = key(...t);
+      if (kept.has(id) && sides(t).filter((n) => kept.has(n)).length < 2) {
+        kept.delete(id);
+        changed = true;
+      }
+    }
+  }
+  return list.filter((t) => kept.has(key(...t)));
+}
+
 // Triangles with vertical lines (the old sheets); vertex (i, j) of the small lattice is at
 // x = j·h, y = i·s + j·s/2. Three line families: j = const (vertical), i = const, i + j = const.
 function triangular(box: Box, area: number, k: number): Raw | null {
@@ -328,7 +357,7 @@ function triangular(box: Box, area: number, k: number): Raw | null {
         if (inside(V(I + 1, J)) && inside(V(I + 1, J + 1)) && inside(V(I, J + 1))) out.push([I, J, 1]);
       }
     }
-    return out;
+    return pruneTriangles(out);
   };
   const placed = bestPlacement(k * s < 8 ? 3 : 8, (a, b) => {
     const ox = a * k * h, oy = b * k * s;
@@ -511,6 +540,16 @@ function kagome(box: Box, area: number, k: number): Raw | null {
         }
       }
     }
+    // A large triangle touches three large hexagons; with only one of them on the sheet it is
+    // a sharp tooth on the edge, so it goes. With two it fills a notch between them, and stays.
+    const hexKeys = new Set(hexes.map(([x, y]) => pointKey(x, y)));
+    for (const [key, [tx, ty, j]] of tris) {
+      const around = [j, j + 2, j + 4].map((n) => {
+        const t = Math.PI / 6 + (n % 6) * Math.PI / 3 + Math.PI;  // from the triangle back to a hexagon
+        return pointKey(tx + 2 * A / SQRT3 * Math.cos(t), ty + 2 * A / SQRT3 * Math.sin(t));
+      });
+      if (around.filter((h) => hexKeys.has(h)).length < 2) tris.delete(key);
+    }
     return { hexes, tris };
   };
   // Small cells fill the page alike wherever the lattice starts; large ones are worth placing.
@@ -530,17 +569,31 @@ function kagome(box: Box, area: number, k: number): Raw | null {
     const dx = Math.abs(x - cx), dy = Math.abs(y - cy);
     return dy <= SQRT3 / 2 * side + EPS && SQRT3 * dx + dy <= SQRT3 * side + EPS;
   };
+  const inTri = (x: number, y: number, c: number[][]) => {
+    const side = (p: number[], q: number[]) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]);
+    const s0 = side(c[0], c[1]), s1 = side(c[1], c[2]), s2 = side(c[2], c[0]);
+    return (s0 >= -EPS && s1 >= -EPS && s2 >= -EPS) || (s0 <= EPS && s1 <= EPS && s2 <= EPS);
+  };
+  // Points at a large hexagon's corner are as near the next centre as their own, so the nearest
+  // centre and its six neighbours are all tried.
+  const NEAR = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
   const covered = (x: number, y: number) => {
     const fv = (y - oy) / (SQRT3 * A), fu = (x - ox - A * fv) / (2 * A), fw = -fu - fv;
     let u = Math.round(fu), v = Math.round(fv);
     const w = Math.round(fw);
     const du = Math.abs(u - fu), dv = Math.abs(v - fv), dw = Math.abs(w - fw);
     if (du > dv && du > dw) u = -v - w; else if (dv > dw) v = -u - w;
-    const cx = ox + 2 * A * u + A * v, cy = oy + SQRT3 * A * v;
-    if (insideHex(x, y, cx, cy, A)) return hexSet.has(pointKey(cx, cy));
-    const j = mod(Math.round((Math.atan2(y - cy, x - cx) - Math.PI / 6) / (Math.PI / 3)), 6);
-    const [tx, ty] = triCentre(cx, cy, A, j);
-    return tris.has(pointKey(tx, ty));
+    for (const [a1, b1] of NEAR) {
+      const cx = ox + 2 * A * (u + a1) + A * (v + b1), cy = oy + SQRT3 * A * (v + b1);
+      if (insideHex(x, y, cx, cy, A)) return hexSet.has(pointKey(cx, cy));
+      for (let j = 0; j < 6; j++) {
+        if (inTri(x, y, triCorners(cx, cy, A, j))) {
+          const [tx, ty] = triCentre(cx, cy, A, j);
+          return tris.has(pointKey(tx, ty));
+        }
+      }
+    }
+    return false;
   };
 
   // Small cells whose centre is covered, collected as pieces of the lines they lie on. Every
@@ -732,12 +785,9 @@ function mergeZones(rings: { from: number; to: number; sectors: number }[]) {
 }
 
 /** Side of a small cell in mm (square, tri, hex), width and height (rect); polar: side of a square of that area. */
-export function cellSides(s: Pick<Settings, 'grid' | 'area' | 'turn'>): { a: number; b?: number } {
+export function cellSides(s: Pick<Settings, 'grid' | 'area'>): { a: number; b?: number } {
   const A = s.area;
-  if (s.grid === 'rect') {
-    const w = Math.sqrt(A / Math.SQRT2), h = Math.sqrt(A * Math.SQRT2);
-    return s.turn ? { a: h, b: w } : { a: w, b: h };
-  }
+  if (s.grid === 'rect') return { a: Math.sqrt(A / Math.SQRT2), b: Math.sqrt(A * Math.SQRT2) };
   if (s.grid === 'tri') return { a: 2 * Math.sqrt(A / SQRT3) };
   if (s.grid === 'hex' || s.grid === 'kagome') return { a: Math.sqrt(2 * A / (3 * SQRT3)) };
   return { a: Math.sqrt(A) };
@@ -761,9 +811,8 @@ export function buildGrid(s: Settings): Grid {
   const width = s.landscape ? paper.height : paper.width;
   const height = s.landscape ? paper.width : paper.height;
   const box: Box = { hw: width / 2 - s.margin, hh: height / 2 - s.margin };
-  const turn = s.turn && turnable(s.grid);
   // A turned grid is built for the page turned sideways, then rotated back.
-  const frame: Box = turn ? { hw: box.hh, hh: box.hw } : box;
+  const frame = box;
 
   let raw: Raw | null = null;
   if (s.grid === 'square') raw = squareLike(frame, Math.sqrt(s.area), Math.sqrt(s.area), s.group);
@@ -814,7 +863,7 @@ export function buildGrid(s: Settings): Grid {
     const out = new Array<number>(pts.length);
     for (let i = 0; i < pts.length; i += 2) {
       const x = pts[i] - cx, y = pts[i + 1] - cy;
-      if (turn) { out[i] = -y; out[i + 1] = x; } else { out[i] = x; out[i + 1] = y; }
+      out[i] = x; out[i + 1] = y;
     }
     return out;
   };
@@ -831,7 +880,7 @@ export function buildGrid(s: Settings): Grid {
   const minor = draw(raw.minor as number[][]) + circlePath(raw.minorCircles ?? []) + arcs(raw.arcs?.minor);
   const major = draw(raw.major as number[][]) + circlePath(raw.majorCircles ?? []) + arcs(raw.arcs?.major);
   const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
-  const extent: Grid['extent'] = turn ? [-hy, -hx, hy, hx] : [-hx, -hy, hx, hy];
+  const extent: Grid['extent'] = [-hx, -hy, hx, hy];
 
   return {
     width, height, minor, major, name: name(raw.majors), majors: raw.majors, cells: raw.cells,
@@ -842,7 +891,7 @@ export function buildGrid(s: Settings): Grid {
 /** The sheet as an SVG document fragment (starts with <svg); sized in millimetres. */
 export function renderSheet(s: Settings, grid: Grid = buildGrid(s)): string {
   const { width: W, height: H } = grid;
-  const ink = INKS[s.ink];
+  const ink = inkColors(s.ink);
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="${fmt(W)}mm" height="${fmt(H)}mm" viewBox="${fmt(-W / 2)} ${fmt(-H / 2)} ${fmt(W)} ${fmt(H)}">`,
     `<title>${grid.name}</title>`,
