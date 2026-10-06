@@ -87,6 +87,7 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.6.1** — siatka biegunowa bez dużych pól (*k* = 1) rysuje się cienkimi liniami, jak pozostałe.
 - **1.6** — siatka biegunowa: liczby pól w pierścieniu z Human Scale Numbers; na części koła
   pole w środku jest taką samą częścią środka koła.
 - **1.5** — siatka biegunowa od nowa: w środku całe pole, wokół pierścienie dużych pól bliskich

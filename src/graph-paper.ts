@@ -11,7 +11,7 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.6';
+export const TOOL_VERSION = '1.6.1';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
@@ -825,6 +825,8 @@ function polarGrid(box: Box, area: number, k: number, part: number) {
   major += arcPath(r, inner.map((c) => [...c] as [number, number]));
   major += spokePath(majorSpokes);
   minor += spokePath(minorSpokes);
+  // Without larger cells (k = 1) every line is a thin one, as in the other grids.
+  if (k === 1) { minor = major + minor; major = ''; }
   const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
   return {
     minor, major, majors, cells: (majors - 1) * k * k + centreCells,

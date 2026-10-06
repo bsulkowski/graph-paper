@@ -105,6 +105,7 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.6.1** — the polar grid without larger cells (*k* = 1) is drawn in thin lines, like the others.
 - **1.6** — the polar grid: counts in a ring from Human Scale Numbers; on a part of the circle
   the centre field is that part of the circle's.
 - **1.5** — the polar grid anew: a whole field in the centre, rings of near-square larger cells

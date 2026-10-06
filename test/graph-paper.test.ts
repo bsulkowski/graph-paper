@@ -254,6 +254,15 @@ test('small cells fill whole larger ones (square, rect, tri)', () => {
   }
 });
 
+test('without larger cells (k = 1) every line is thin', () => {
+  for (const grid of GRIDS) {
+    for (const part of grid === 'polar' ? PARTS : [1]) {
+      const g = sheet({ grid, group: 1, part });
+      assert.ok(g.minor.length > 0 && g.major === '', `${grid} ${part}`);
+    }
+  }
+});
+
 test('too large a cell gives no grid, not an error', () => {
   const g = sheet({ grid: 'hex', area: AREAS[AREAS.length - 1], group: 5, paper: 'a5' });
   assert.equal(g.fits, false);
