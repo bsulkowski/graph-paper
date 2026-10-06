@@ -2,7 +2,7 @@
 
 *Dostępne także po angielsku: [README](README.md)*
 
-Papier do druku z siatką kwadratową, prostokątną, trójkątną, sześciokątną i biegunową —
+Papier do druku z siatką kwadratową, prostokątną, trójkątną, sześciokątną, kagome i biegunową —
 komórki mierzone polem. Kartkę rysuje się w przeglądarce na
 **[bsulkowski.pl/pl/graph-paper](https://bsulkowski.pl/pl/graph-paper)**; w tym repozytorium
 jest kod, który ją rysuje.

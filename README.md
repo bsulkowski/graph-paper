@@ -2,7 +2,7 @@
 
 *Also available in Polish: [README](README_PL.md)*
 
-Printable grid paper — square, rectangular, triangular, hexagonal and polar — with cells
+Printable grid paper — square, rectangular, triangular, hexagonal, kagome and polar — with cells
 measured by area. Draw a sheet in the browser at **[bsulkowski.pl/graph-paper](https://bsulkowski.pl/graph-paper)**;
 this repository holds the code that draws it.
 
