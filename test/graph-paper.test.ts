@@ -1,7 +1,8 @@
 // Graph paper: geometry and link parameters.
 //
 // - Sheets of the older generator (hard-coded A4 sheets) that are still drawn the same:
-//   same name, so the same count of larger cells; polar zones as hard-coded there.
+//   same name, so the same count of larger cells.
+// - The polar grid: rings of near-square larger cells, counts from the allowed set.
 // - Every grid, area and larger cell stays within the margin, on every paper.
 // - Settings survive the trip through the link.
 //
@@ -10,8 +11,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AREAS, DEFAULTS, GRIDS, GROUPS, MARGINS, PAPERS, SECTORS, SECTORS_THIRD,
-  buildGrid, groupFor, inkColors, parseSettings, polarRings, renderSheet, sectorsFor, settingsQuery,
+  AREAS, DEFAULTS, GRIDS, GROUPS, MARGINS, PAPERS, PARTS,
+  buildGrid, groupFor, inkColors, parseSettings, polarRings, renderSheet, settingsQuery,
   type GridType, type Paper, type Settings,
 } from '../src/graph-paper.ts';
 
@@ -43,43 +44,42 @@ test('old A4 sheets that fill the page come out the same', () => {
     ['square_grid_54x36x25mm2', { grid: 'square', area: area(25), group: 6 }],
     ['square_grid_40x25x50mm2', { grid: 'square', area: area(50), group: 5 }],
     ['rectangular_grid_64x16x50mm2', { grid: 'rect', area: area(50), group: 4 }],
-    ['polar_grid_36x8x100mm2', { grid: 'polar', area: area(100), group: 8, sectors: 12 }],
-    ['polar_grid_50x12x50mm2', { grid: 'polar', area: area(50), group: 12, sectors: 10 }],
-    ['polar_grid_32x16x50mm2', { grid: 'polar', area: area(50), group: 16, sectors: 8 }],
     ['hexagonal_grid_24x16x100mm2', { grid: 'hex', area: area(100), group: 4 }],
   ];
   for (const [name, s] of same) assert.equal(sheet(s).name, name);
 });
 
-test('polar zones of the old sheets', () => {
-  const zones = (M: number, g: number, J: number) => {
-    const out: string[] = [];
-    for (const r of polarRings(M, g, J)) {
-      const last = out[out.length - 1];
-      if (last?.endsWith(`:${r.sectors}`)) out[out.length - 1] = last.replace(/-\d+:/, `-${r.to}:`);
-      else out.push(`${r.from}-${r.to}:${r.sectors}`);
-    }
-    return out.join(' ');
-  };
-  // Older generator: rings 0–2, 1–4, 2–6 in units of 12, 24, 48 cells (radius² in cells × area / π).
-  assert.equal(zones(12, 8, 3), '0-24:12 24-96:24 96-288:48');
-  // Older generator: 0–2 × 10, 1–3 × 20, 2–4 × 30, 3–6 × 40, 4–10 × 60.
-  assert.equal(zones(10, 12, 5), '0-20:10 20-60:20 60-120:30 120-240:40 240-600:60');
-});
+const ALLOWED = new Set([2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]);
+const allowed = (n: number) => ALLOWED.has(n) || (n >= 60 && n % 30 === 0);
 
-test('polar rings: whole larger rings, larger spokes on small ones', () => {
-  for (const M of SECTORS) {
-    for (const g of GROUPS.polar) {
-      const rings = polarRings(M, g, 3);
-      let B = 0;
-      for (const r of rings) {
-        assert.equal(r.from, B);
-        assert.equal(r.sectors % M, 0, `${M}/${g}: sectors a multiple of ${M}`);
-        assert.equal((M * g) % r.sectors, 0, `${M}/${g}: sectors divide a larger ring`);
-        B = r.to;
-      }
-      assert.equal(B, 3 * M * g);
+test('polar rings: the same sequence at every size, squarest allowed counts', () => {
+  assert.equal(polarRings(1, 12).rings.map((r) => r.sectors).join(' '), '6 12 20 24 30 40 40 60 60 60 60 90');
+  for (const part of PARTS) {
+    const span = 2 * Math.PI / part;
+    const { centre, rings } = polarRings(part, 60);
+    // The centre field and every larger cell have the same area (1 in these units).
+    assert.ok(Math.abs(span / 2 * centre ** 2 - 1) < 1e-9);
+    let r = centre;
+    for (const ring of rings) {
+      assert.ok(allowed(ring.sectors), `${part}: ${ring.sectors} is not allowed`);
+      assert.ok(Math.abs(ring.from - r) < 1e-12);
+      assert.ok(Math.abs(span / 2 * (ring.to ** 2 - ring.from ** 2) - ring.sectors) < 1e-9);
+      // Depth : width stays near square; the jumps 40 → 60 → 90 cost the most.
+      const q = (ring.to - ring.from) / (span * (ring.from + ring.to) / 2 / ring.sectors);
+      assert.ok(q > 0.66 && q < 1.5, `${part}: ring of ${ring.sectors} at ${ring.from.toFixed(1)} is ${q.toFixed(2)}`);
+      r = ring.to;
     }
+  }
+  // On a sheet: the same sequence (rings in mm), each larger cell k² cells of the chosen area.
+  for (const [a, k, part] of [[50, 3, 1], [8, 5, 2], [25, 4, 3], [4, 2, 4]]) {
+    const g = sheet({ grid: 'polar', area: area(a), group: k, part });
+    const seq = polarRings(part, g.rings!.length).rings;
+    const span = 2 * Math.PI / part;
+    g.rings!.forEach((ring, i) => {
+      assert.equal(ring.sectors, seq[i].sectors);
+      assert.ok(Math.abs(span / 2 * (ring.to ** 2 - ring.from ** 2) / ring.sectors - k * k * area(a)) < 1e-6);
+    });
+    assert.equal(g.cells, g.majors * k * k);
   }
 });
 
@@ -126,8 +126,9 @@ const papers = Object.keys(PAPERS) as Paper[];
 
 const variants: { label: string; grid: GridType; extra: Partial<Settings> }[] = [
   ...GRIDS.map((grid) => ({ label: grid, grid, extra: {} })),
-  { label: 'polar ⅓', grid: 'polar', extra: { part: 3, sectors: 4 } },
-  { label: 'polar ⅓ (2 per arc)', grid: 'polar', extra: { part: 3, sectors: 2 } },
+  { label: 'polar ½', grid: 'polar', extra: { part: 2 } },
+  { label: 'polar ⅓', grid: 'polar', extra: { part: 3 } },
+  { label: 'polar ¼', grid: 'polar', extra: { part: 4 } },
 ];
 
 for (const { label: variant, grid, extra } of variants) {
@@ -162,23 +163,28 @@ for (const { label: variant, grid, extra } of variants) {
   });
 }
 
-test('the ⅓ sector: name, edge along the page, three of them make the circle', () => {
-  const third = sheet({ grid: 'polar', part: 3, sectors: 4, group: 8, area: area(100) });
-  assert.equal(third.name, 'sector_grid_44x8x100mm2');
-  assert.equal(third.cells, 44 * 8);
-  // One straight edge is vertical: some major line has both ends at the same x.
-  assert.ok(/M(-?[\d.]+) (-?[\d.]+)L\1 /.test(third.major), 'a vertical edge');
-  // Zones and radii as on the full circle with three times as many larger cells, so three
-  // sheets put together continue each other's lines.
-  const full = sheet({ grid: 'polar', part: 1, sectors: 12, group: 8, area: area(100) });
-  const n = Math.min(full.rings!.length, third.rings!.length) - 1;
-  for (let i = 0; i < n; i++) {
-    assert.equal(third.rings![i].sectors * 3, full.rings![i].sectors);
-    assert.ok(Math.abs(third.rings![i].to - full.rings![i].to) < 1e-9);
+test('parts of the circle: names, straight edges along the page', () => {
+  const names = PARTS.map((part) => sheet({ grid: 'polar', part, group: 3, area: area(50) }).name.split('_')[0]);
+  assert.deepEqual(names, ['polar', 'semicircle', 'sector', 'quadrant']);
+  const vertical = (d: string) => /M(-?[\d.]+) (-?[\d.]+)L\1 /.test(d);
+  const horizontal = (d: string) => /M(-?[\d.]+) (-?[\d.]+)L(-?[\d.]+) \2(?![\d.])/.test(d);
+  for (const part of [2, 3]) {
+    // Portrait: the straight edge on the long side, so vertical; landscape: horizontal.
+    assert.ok(vertical(sheet({ grid: 'polar', part, group: 3, area: area(50) }).major), `${part} portrait`);
+    assert.ok(horizontal(sheet({ grid: 'polar', part, group: 3, area: area(50), landscape: true }).major), `${part} landscape`);
   }
-  // On landscape paper the straight edge turns horizontal.
-  const wide = sheet({ grid: 'polar', part: 3, sectors: 4, group: 8, area: area(100), landscape: true });
-  assert.ok(wide.extent[2] - wide.extent[0] > wide.extent[3] - wide.extent[1]);
+  const q = sheet({ grid: 'polar', part: 4, group: 3, area: area(50) }).major;
+  assert.ok(vertical(q) && horizontal(q), 'a quarter has both');
+  // The circle: the centre field is the only cell at the centre of the page, rings around it.
+  const full = sheet({ grid: 'polar', group: 3, area: area(50) });
+  assert.equal(full.rings![0].sectors, 6);
+  assert.ok(full.majors > 1 + 6 + 12 + 20);
+});
+
+test('too small a page for the centre field gives no polar grid', () => {
+  const g = sheet({ grid: 'polar', area: 1000, group: 10 });
+  assert.equal(g.fits, false);
+  assert.equal(g.majors, 0);
 });
 
 test('kagome: hexagons with triangles, whole larger cells, no three lines in a point', () => {
@@ -253,11 +259,12 @@ test('settings survive the link', () => {
   assert.equal(settingsQuery(DEFAULTS), '');
   const samples: Settings[] = [
     { ...DEFAULTS, grid: 'hex', area: area(12.5), group: 3, paper: 'a3', landscape: true, ink: 'green', margin: 15, caption: false },
-    { ...DEFAULTS, grid: 'polar', area: area(35), group: 12, sectors: 10, ink: 'blue' },
+    { ...DEFAULTS, grid: 'polar', area: area(35), group: 5, ink: 'blue' },
     { ...DEFAULTS, grid: 'tri', area: area(6.25), group: 1, paper: 'letter' },
     { ...DEFAULTS, grid: 'rect', area: area(800), group: 2, ink: '1f3a7a' },
-    { ...DEFAULTS, grid: 'polar', part: 3, sectors: 4, group: 8, area: area(100) },
-    { ...DEFAULTS, grid: 'polar', part: 3, sectors: 6, group: 16, landscape: true },
+    { ...DEFAULTS, grid: 'polar', part: 3, group: 8, area: area(100) },
+    { ...DEFAULTS, grid: 'polar', part: 2, group: 1, landscape: true },
+    { ...DEFAULTS, grid: 'polar', part: 4, group: 10, area: area(2) },
     { ...DEFAULTS, grid: 'kagome', area: area(25), group: 7, paper: 'a3' },
   ];
   for (const s of samples) assert.deepEqual(parseSettings(new URLSearchParams(settingsQuery(s))), s);
@@ -265,20 +272,16 @@ test('settings survive the link', () => {
   for (const a of AREAS) assert.equal(parseSettings(new URLSearchParams(settingsQuery({ ...DEFAULTS, area: a }))).area, a);
 });
 
-test('the ⅓ sector in the link', () => {
-  assert.equal(settingsQuery({ ...DEFAULTS, grid: 'polar', group: 8, part: 3, sectors: 4 }), 'grid=polar&part=3');
-  // Links from before version 1.1 have no part: the whole circle, as before.
-  const old = parseSettings(new URLSearchParams('grid=polar&sectors=10&group=12'));
-  assert.equal(old.part, 1);
-  assert.equal(old.sectors, 10);
-  // A count offered only for the circle falls back to the default of the third.
-  assert.equal(parseSettings(new URLSearchParams('grid=polar&part=3&sectors=12')).sectors, 4);
-  // Switching keeps the spacing where it can: 12 around the circle = 4 along a third.
-  assert.equal(sectorsFor(3, 12, 1), 4);
-  assert.equal(sectorsFor(1, 2, 3), 6);
-  assert.equal(sectorsFor(3, 10, 1), 4);
-  for (const n of SECTORS_THIRD) assert.ok(sectorsFor(3, n, 3) === n);
-  for (const n of SECTORS) assert.ok(sectorsFor(1, n, 1) === n);
+test('parts of the circle in the link', () => {
+  assert.equal(settingsQuery({ ...DEFAULTS, grid: 'polar', group: 3, part: 3 }), 'grid=polar&part=3');
+  assert.equal(settingsQuery({ ...DEFAULTS, grid: 'polar', group: 3, part: 1 }), 'grid=polar');
+  // No part: the whole circle; an unknown one too.
+  assert.equal(parseSettings(new URLSearchParams('grid=polar')).part, 1);
+  assert.equal(parseSettings(new URLSearchParams('grid=polar&part=5')).part, 1);
+  // Links before 1.5: `sectors` is gone (the grid chooses), the group means k now.
+  const old = parseSettings(new URLSearchParams('grid=polar&sectors=10&group=8'));
+  assert.deepEqual(old, { ...DEFAULTS, grid: 'polar', group: 8 });
+  assert.equal(parseSettings(new URLSearchParams('grid=polar&group=12')).group, groupFor('polar', 0));
 });
 
 test('links from before 1.4: a turned grid becomes turned paper', () => {
@@ -310,16 +313,12 @@ test('unknown link parameters fall back to defaults', () => {
   assert.equal(parseSettings(new URLSearchParams('grid=kagome&group=6')).group, groupFor('kagome', 6));
 });
 
-test('switching to kagome keeps k only if it is odd and offered', () => {
-  assert.equal(groupFor('kagome', 3, 'hex'), 3);
-  assert.equal(groupFor('kagome', 6, 'square'), 3);
-  assert.equal(groupFor('kagome', 1, 'tri'), 1);
-});
-
-test('switching grids keeps k × k, but not into or out of polar', () => {
-  assert.equal(groupFor('tri', 4, 'square'), 4);
-  assert.equal(groupFor('hex', 6, 'square'), 6);
-  assert.equal(groupFor('kagome', 6, 'square'), groupFor('kagome', 0));
-  assert.equal(groupFor('polar', 4, 'hex'), 8);
-  assert.equal(groupFor('square', 8, 'polar'), groupFor('square', 0));
+test('switching grids keeps k where the grid offers it (kagome: odd k)', () => {
+  assert.equal(groupFor('kagome', 3), 3);
+  assert.equal(groupFor('kagome', 6), 3);
+  assert.equal(groupFor('kagome', 1), 1);
+  assert.equal(groupFor('tri', 4), 4);
+  assert.equal(groupFor('hex', 6), 6);
+  assert.equal(groupFor('polar', 4), 4);
+  assert.equal(groupFor('square', 10), 10);
 });

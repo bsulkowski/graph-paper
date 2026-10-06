@@ -20,10 +20,10 @@ without a ruler, and the grid fills the page with whole larger cells.
 | Triangular | an equilateral triangle | a triangle with side *k*, made of *k*² cells |
 | Hexagonal | a regular hexagon | a hexagon with *k*² times the area, centred on a small one |
 | Kagome | a regular hexagon, with a triangle of a sixth of its area at each corner | every *k*-th line (*k* odd, up to 9): the same pattern *k* times larger |
-| Polar | a piece of a ring, the same area everywhere | *g* cells; how many larger cells make a ring is set separately |
-| Polar, ⅓ of a circle | the same, on a 120° sector | the same; the count is along the arc of the sector |
+| Polar | a piece of a ring, the same area everywhere | a piece of a ring of *k* × *k* cells, close to a square; a whole field in the centre |
+| Polar, ½, ⅓ or ¼ of a circle | the same, on a part of the circle | the same |
 
-For the other grids *k* goes from 1 to 10. Turning the paper turns the grid with it: a landscape
+In every grid but kagome *k* goes from 1 to 10. Turning the paper turns the grid with it: a landscape
 sheet of tall rectangles is a portrait sheet of wide ones, seen from the side.
 
 Larger triangles held to the rest by one side only would stick out as sharp teeth, so they are
@@ -43,16 +43,20 @@ so the edge has the notches of their outline.
 
 The polar grid is **experimental**: its drawing and link parameters may still change.
 
-In the polar grid every cell has the same area, from the centre to the edge. The number of
-sectors grows outward in steps, wherever the cells would otherwise get too wide, and the
-circles and spokes of the larger cells always run along those of the small ones.
+The polar grid has a field in the centre, left whole, and rings of larger cells around it.
+Every larger cell has the area of the centre field, and each ring takes as many of them as
+makes them closest to squares, out of 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60, 90,
+120, 150 … (the divisors of 120, then multiples of 30), so the spokes fall at simple angles.
+Around the whole circle the rings hold 6, 12, 20, 24, 30, 40, 40, 60 … larger cells at every
+size; the size only decides how many rings fit. A larger cell is split into *k* × *k* small
+ones — *k* along the arc and *k* rings of equal area across — so every small cell has the
+chosen area. Beyond the last whole ring the larger cells that fit on the page are drawn too,
+as long as they touch a cell of the ring inside and have a neighbour in their own ring.
 
-The polar grid can also be drawn on a third of the circle. A 120° sector with one straight edge
-along the long side of the page is the largest piece of a circle a sheet holds: on A4 it has
-about a quarter more room than the whole circle. Its lines are those of the whole circle with
-three times as many larger cells, so three sheets put together make one circle about 37 cm
-across, and a single sheet rolls into a cone. It also suits diagrams that widen from one point,
-such as a fan chart of ancestors, read with the sheet turned.
+The polar grid can also be drawn on half, a third or a quarter of the circle: a half and a
+third with a straight edge along the long side of the page, a quarter in a corner. The count in
+a ring is then along the arc of that part. A part suits diagrams that widen from one point,
+such as a fan chart of ancestors, and a single sheet rolls into a cone.
 
 The area is chosen from [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
 — 1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8, 10 … — from 1 mm² (millimetre paper) to 10 cm².
@@ -62,9 +66,10 @@ Every third step doubles the area and every tenth multiplies it by ten: 25 mm² 
 ## Sheet names
 
 Every sheet has a name such as `square_grid_24x36x50mm2`: the grid, the number of larger cells
-on the sheet, the cells in each of them and the area of one cell. The polar grid on a third of
-the circle is called `sector_grid_…`. It is printed in the bottom
-left corner and used as the file name.
+on the sheet, the cells in each of them and the area of one cell. It is printed in the bottom
+left corner and used as the file name. On a part of the circle the polar grid is called
+`semicircle_grid_…`, `sector_grid_…` (a third) or `quadrant_grid_…`; the field in the centre
+counts as one larger cell.
 
 Ready-made A4 sheets are in [`examples/`](examples).
 
@@ -97,6 +102,9 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.5** — the polar grid anew: a whole field in the centre, rings of near-square larger cells
+  of *k* × *k* small ones (`group` is *k* now, `sectors` from an older link is ignored); also on
+  half and a quarter of the circle (`part=2`, `part=4`).
 - **1.4** — larger cells from 1 to 10 (kagome: odd, up to 9); a colour of one's own for the
   lines (`ink=1f3a7a`); no more turning the grid on the page (`turn=1` from an older link turns
   the paper instead); larger triangles held by one side only are left off.
@@ -109,7 +117,7 @@ what was drawn before. The placement of the grid on the page may still improve.
 ## Tests
 
 ```sh
-npm test            # geometry, margins on every paper, polar zones, link parameters
+npm test            # geometry, margins on every paper, polar rings, link parameters
 npm run examples    # redraw examples/
 ```
 

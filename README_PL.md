@@ -21,10 +21,10 @@ bez linijki — a siatka wypełnia kartkę całymi dużymi polami.
 | Trójkątna | trójkąt równoboczny | trójkąt o boku *k*, złożony z *k*² komórek |
 | Sześciokątna | sześciokąt foremny | sześciokąt o *k*² razy większym polu, ze środkiem w środku małego |
 | Kagome | sześciokąt foremny, w każdym rogu trójkąt o szóstej części jego pola | co *k*-ta linia (*k* nieparzyste, do 9): ten sam wzór *k* razy większy |
-| Biegunowa | wycinek pierścienia, wszędzie o tym samym polu | *g* komórek; liczbę dużych pól w pierścieniu ustawia się osobno |
-| Biegunowa, ⅓ koła | to samo, na wycinku 120° | to samo; liczba dużych pól dotyczy łuku wycinka |
+| Biegunowa | wycinek pierścienia, wszędzie o tym samym polu | wycinek pierścienia z *k* × *k* komórek, bliski kwadratu; w środku całe pole |
+| Biegunowa, ½, ⅓ lub ¼ koła | to samo, na części koła | to samo |
 
-W pozostałych siatkach *k* wynosi od 1 do 10. Obrócenie kartki obraca siatkę razem z nią:
+We wszystkich siatkach poza kagome *k* wynosi od 1 do 10. Obrócenie kartki obraca siatkę razem z nią:
 kartka pozioma z wysokimi prostokątami to kartka pionowa z szerokimi, oglądana z boku.
 
 Duże trójkąty trzymające się reszty tylko jednym bokiem sterczałyby jak ostre zęby, więc się
@@ -44,16 +44,22 @@ mieszczą, i duże trójkąty obok nich — więc brzeg ma załamania ich obrysu
 
 Siatka biegunowa jest **eksperymentalna**: jej rysunek i parametry linku mogą się jeszcze zmienić.
 
-W siatce biegunowej każda komórka ma to samo pole, od środka aż po brzeg. Liczba wycinków
-rośnie na zewnątrz skokami, tam gdzie komórki zrobiłyby się za szerokie, a okręgi i promienie
-dużych pól zawsze biegną po liniach małych.
+Siatka biegunowa ma w środku jedno pole, niepodzielone, a wokół niego pierścienie dużych pól.
+Każde duże pole ma tyle miejsca co pole w środku, a każdy pierścień dostaje ich tyle, żeby
+były jak najbliższe kwadratom — spośród 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60, 90,
+120, 150 … (dzielniki 120, potem wielokrotności 30), więc promienie wypadają pod prostymi
+kątami. Wokół całego koła pierścienie mają 6, 12, 20, 24, 30, 40, 40, 60 … dużych pól przy
+każdej wielkości; wielkość decyduje tylko o tym, ile pierścieni się zmieści. Duże pole dzieli się
+na *k* × *k* małych — *k* wzdłuż łuku i *k* pierścieni o równym polu w poprzek — więc każda
+mała komórka ma wybrane pole. Za ostatnim pełnym pierścieniem rysują się jeszcze duże pola,
+które mieszczą się na kartce, o ile stykają się z polem pierścienia pod spodem i mają sąsiada
+we własnym pierścieniu.
 
-Siatkę biegunową można też narysować na jednej trzeciej koła. Wycinek 120° z prostym bokiem
-wzdłuż dłuższej krawędzi kartki to największy kawałek koła, jaki mieści się na arkuszu: na A4
-ma o mniej więcej jedną czwartą więcej miejsca niż całe koło. Linie są te same co w całym kole
-z trzy razy większą liczbą dużych pól, więc trzy kartki złożone razem dają jedno koło
-o średnicy około 37 cm, a pojedynczą da się zwinąć w stożek. Pasuje też do diagramów, które
-rozszerzają się od jednego punktu, jak wachlarz przodków — czytany przy obróconej kartce.
+Siatkę biegunową można też narysować na połowie, jednej trzeciej albo ćwiartce koła: połowę
+i jedną trzecią prostym bokiem wzdłuż dłuższej krawędzi kartki, ćwiartkę w rogu. Liczba dużych
+pól w pierścieniu dotyczy wtedy łuku tej części. Część koła pasuje do diagramów, które
+rozszerzają się od jednego punktu, jak wachlarz przodków, a pojedynczą kartkę da się zwinąć
+w stożek.
 
 Pole wybiera się z [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
 — 1; 1,25; 1,6; 2; 2,5; 3,2; 4; 5; 6,4; 8; 10 … — od 1 mm² (papier milimetrowy) do 10 cm².
@@ -64,7 +70,8 @@ kratka 5 mm, 100 mm² — kratka 1 cm.
 
 Każdy arkusz ma nazwę w rodzaju `square_grid_24x36x50mm2`: rodzaj siatki, liczba dużych pól
 na kartce, liczba komórek w każdym z nich i pole jednej komórki. Drukuje się w lewym dolnym
-rogu i służy za nazwę pliku. Siatka biegunowa na jednej trzeciej koła nazywa się `sector_grid_…`.
+rogu i służy za nazwę pliku. Siatka biegunowa na części koła nazywa się `semicircle_grid_…`,
+`sector_grid_…` (jedna trzecia) albo `quadrant_grid_…`; pole w środku liczy się jako jedno duże.
 
 Gotowe arkusze A4 są w katalogu [`examples/`](examples).
 
@@ -78,6 +85,9 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.5** — siatka biegunowa od nowa: w środku całe pole, wokół pierścienie dużych pól bliskich
+  kwadratom, każde z *k* × *k* małych (`group` to teraz *k*, `sectors` ze starszego linku
+  jest pomijane); także na połowie i ćwiartce koła (`part=2`, `part=4`).
 - **1.4** — duże pole od 1 do 10 (kagome: nieparzyste, do 9); własny kolor linii
   (`ink=1f3a7a`); bez obracania siatki na kartce (`turn=1` ze starszego linku obraca kartkę);
   bez dużych trójkątów trzymających się jednym bokiem.

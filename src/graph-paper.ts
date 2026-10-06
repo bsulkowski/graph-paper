@@ -11,7 +11,7 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.4';
+export const TOOL_VERSION = '1.5';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
@@ -21,9 +21,8 @@ export type Ink = Preset | string;  // a preset, or a colour of one's own as six
 export interface Settings {
   grid: GridType;
   area: number;      // mm² of one small cell, a value of AREAS
-  group: number;     // larger cell: k × k small cells (square, rect, tri, hex) or g cells (polar)
-  sectors: number;   // polar: larger cells in one ring (in its third for part 3)
-  part: number;      // polar: 1 = the whole circle, 3 = a third of it (a 120° sector)
+  group: number;     // larger cell: k × k small cells (kagome: every k-th line)
+  part: number;      // polar: 1 = the whole circle, 2, 3, 4 = its half, third, quarter
   paper: Paper;
   landscape: boolean;
   margin: number;    // mm, on every side; the caption sits inside the bottom margin
@@ -39,7 +38,7 @@ export const GRIDS: GridType[] = ['square', 'rect', 'tri', 'hex', 'kagome', 'pol
 const HSN = [1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8];
 export const AREAS: number[] = [1, 10, 100].flatMap((m) => HSN.map((v) => Number((v * m).toPrecision(4)))).concat(1000);
 
-// The larger cell: how many times its side is the small one's (polar: cells in it).
+// The larger cell: how many times its side is the small one's.
 const UP_TO_10 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 export const GROUPS: Record<GridType, number[]> = {
   square: UP_TO_10,
@@ -47,14 +46,10 @@ export const GROUPS: Record<GridType, number[]> = {
   tri: UP_TO_10,
   hex: UP_TO_10,
   kagome: [1, 3, 5, 7, 9],
-  polar: [4, 6, 8, 9, 12, 16, 24],
+  polar: UP_TO_10,
 };
-export const SECTORS = [6, 8, 10, 12, 16];
-export const PARTS = [1, 3];
-// Larger cells along the arc of a third: 4 there is 12 around the whole circle.
-export const SECTORS_THIRD = [2, 3, 4, 6, 8];
-const SECTORS_DEFAULT: Record<number, number> = { 1: 12, 3: 4 };
-export const sectorsOf = (part: number) => (part === 3 ? SECTORS_THIRD : SECTORS);
+// The polar grid on the whole circle, or on its half, third or quarter.
+export const PARTS = [1, 2, 3, 4];
 
 export const PAPERS: Record<Paper, { label: string; width: number; height: number }> = {
   a4: { label: 'A4', width: 210, height: 297 },
@@ -80,13 +75,12 @@ export function inkColors(ink: Ink): { minor: string; major: string } {
   return { minor: `#${minor}`, major: `#${c}` };
 }
 
-const GROUP_DEFAULT: Record<GridType, number> = { square: 6, rect: 4, tri: 5, hex: 4, kagome: 3, polar: 8 };
+const GROUP_DEFAULT: Record<GridType, number> = { square: 6, rect: 4, tri: 5, hex: 4, kagome: 3, polar: 3 };
 
 export const DEFAULTS: Settings = {
   grid: 'square',
   area: 50,
   group: 6,
-  sectors: 12,
   part: 1,
   paper: 'a4',
   landscape: false,
@@ -103,22 +97,9 @@ export const SITE_URL = 'bsulkowski.pl/graph-paper';
 const nearest = (list: number[], v: number, log = false) =>
   list.reduce((best, x) => (Math.abs(log ? Math.log(x / v) : x - v) < Math.abs(log ? Math.log(best / v) : best - v) ? x : best));
 
-/**
- * The larger cell to use when switching grids: k × k carries over between square, rect, tri
- * and hex if that grid offers it; polar counts cells differently and starts from its default.
- */
-export function groupFor(grid: GridType, group: number, from: GridType = grid): number {
-  const same = (grid === 'polar') === (from === 'polar');
-  return same && GROUPS[grid].includes(group) ? group : GROUP_DEFAULT[grid];
-}
-
-/**
- * Larger cells in a ring when switching between the circle and its third: the same spacing
- * if that count is offered (12 around the circle = 4 along a third), else the default.
- */
-export function sectorsFor(part: number, sectors: number, from: number = part): number {
-  const carried = from === part ? sectors : from === 1 ? sectors / 3 : sectors * 3;
-  return sectorsOf(part).includes(carried) ? carried : SECTORS_DEFAULT[part];
+/** The larger cell to use when switching grids: k carries over if that grid offers it (kagome: odd k). */
+export function groupFor(grid: GridType, group: number): number {
+  return GROUPS[grid].includes(group) ? group : GROUP_DEFAULT[grid];
 }
 
 /** Reads settings from link parameters; anything missing or unknown falls back to the default. */
@@ -134,9 +115,9 @@ export function parseSettings(params: URLSearchParams): Settings {
   if (area !== null) s.area = nearest(AREAS, area, true);
   const group = num('group');
   s.group = group !== null && GROUPS[s.grid].includes(group) ? group : GROUP_DEFAULT[s.grid];
-  s.part = params.get('part') === '3' ? 3 : 1;
-  const sectors = num('sectors');
-  s.sectors = sectors !== null && sectorsOf(s.part).includes(sectors) ? sectors : SECTORS_DEFAULT[s.part];
+  // Polar links before 1.5 also had `sectors` (larger cells in a ring), now chosen by the grid.
+  const part = num('part');
+  s.part = part !== null && PARTS.includes(part) ? part : 1;
   const paper = params.get('paper');
   if (paper && paper in PAPERS) s.paper = paper as Paper;
   const margin = num('margin');
@@ -155,8 +136,7 @@ export function settingsQuery(s: Settings): string {
   if (s.grid !== DEFAULTS.grid) p.set('grid', s.grid);
   if (s.area !== DEFAULTS.area) p.set('area', areaLabel(s.area));
   if (s.group !== GROUP_DEFAULT[s.grid]) p.set('group', String(s.group));
-  if (s.grid === 'polar' && s.part === 3) p.set('part', '3');
-  if (s.grid === 'polar' && s.sectors !== SECTORS_DEFAULT[s.part]) p.set('sectors', String(s.sectors));
+  if (s.grid === 'polar' && s.part !== 1) p.set('part', String(s.part));
   if (s.paper !== DEFAULTS.paper) p.set('paper', s.paper);
   if (s.landscape) p.set('landscape', '1');
   if (s.margin !== DEFAULTS.margin) p.set('margin', String(s.margin));
@@ -186,7 +166,7 @@ export interface Grid {
   cells: number;           // small cells on the sheet
   perMajor: number;
   cell: { a: number; b?: number };  // see cellSides
-  rings?: { from: number; to: number; sectors: number }[];  // polar zones, radii in mm
+  rings?: { from: number; to: number; sectors: number }[];  // polar rings drawn (some may be partial), radii in mm
   extent: [number, number, number, number];  // bbox of all lines: x0, y0, x1, y1
   fits: boolean;           // false: not even one larger cell fits on the paper
 }
@@ -209,13 +189,6 @@ function polyPath(lines: number[][]): string {
     let d = `M${fmt(pts[0])} ${fmt(pts[1])}L`;
     for (let i = 2; i < pts.length; i += 2) d += `${i > 2 ? ' ' : ''}${fmt(pts[i])} ${fmt(pts[i + 1])}`;
     return d;
-  }).join('');
-}
-
-function circlePath(radii: number[]): string {
-  return radii.map((r) => {
-    const R = fmt(r);
-    return `M${R} 0A${R} ${R} 0 1 0 ${fmt(-r)} 0A${R} ${R} 0 1 0 ${R} 0`;
   }).join('');
 }
 
@@ -274,14 +247,10 @@ interface Box { hw: number; hh: number }  // half-width and half-height of the a
 interface Raw {
   minor: Seg[] | number[][];
   major: Seg[] | number[][];
-  minorCircles?: number[];
-  majorCircles?: number[];
-  arcs?: { minor: number[]; major: number[]; a0: number; span: number };  // radii of arcs around the origin
   chained?: boolean;
   majors: number;
   cells: number;
   perMajor: number;
-  rings?: Grid['rings'];
 }
 
 function squareLike(box: Box, w: number, h: number, k: number): Raw | null {
@@ -654,134 +623,210 @@ function kagome(box: Box, area: number, k: number): Raw | null {
   return { minor, major, majors: hexes.length, cells, perMajor: k * k };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Polar grid
+
+// Larger cells allowed in a ring (along the arc of a half, third or quarter): the divisors of 120
+// up to 60, then multiples of 30 — spokes at simple angles, many of them shared between rings.
+const RING_COUNTS: number[] = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]
+  .concat(Array.from({ length: 98 }, (_, i) => 90 + 30 * i));
+
+export interface PolarRing { from: number; to: number; sectors: number }
+
 /**
- * Rings of the polar grid. Radii in units where R² counts small cells times area/π, so a ring
- * from `from` to `to` holds `to − from` cells. Each ring is cut into `sectors` cells; the count
- * may only change where it divides the cells so far, and must divide one larger ring
- * (sectors × g), so the larger circles and spokes always run along small ones. Where it may
- * change, the count giving the squarest cells wins; at the centre, the one nearest to 12.
- * This reproduces the zones of the old sheets 36x8x100 and 50x12x50 exactly.
+ * Rings of the polar grid on a circle (part 1) or its half, third or quarter. Radii in units of
+ * the side of a square as large as one larger cell: every larger cell has that area, the field in
+ * the centre too. Each ring takes the allowed count of larger cells along its arc that makes them
+ * squarest, so the sequence never depends on the size — the size only decides how many rings fit.
+ * Around a whole circle: 6, 12, 20, 24, 30, 40, 40, 60, 60, 60, 60, 90, …
  */
-export function polarRings(sectors: number, g: number, majorRings: number) {
-  const P = sectors * g;
-  const counts = [...new Set(Array.from({ length: g }, (_, i) => i + 1).filter((m) => g % m === 0).map((m) => sectors * m))]
-    .sort((a, b) => a - b);
-  const aspect = (B: number, n: number) => {
-    const r1 = Math.sqrt(B), r2 = Math.sqrt(B + n);
-    return Math.abs(Math.log((Math.PI * (r1 + r2) / n) / (r2 - r1)));
-  };
-  let n = counts.reduce((best, c) => (Math.abs(Math.log(c / 12)) < Math.abs(Math.log(best / 12)) ? c : best));
-  const rings: { from: number; to: number; sectors: number }[] = [];
-  for (let B = 0; B < majorRings * P; B += n) {
-    if (B > 0) {
-      n = counts.filter((c) => c >= n && B % c === 0)
-        .reduce((best, c) => (aspect(B, c) < aspect(B, best) - 1e-12 ? c : best), n);
-    }
-    rings.push({ from: B, to: B + n, sectors: n });
-  }
-  return rings;
+export function polarRings(part: number, count: number): { centre: number; rings: PolarRing[] } {
+  const span = 2 * Math.PI / part;
+  const centre = Math.sqrt(2 / span);  // a sector of the centre: span / 2 · r² = 1
+  const rings: PolarRing[] = [];
+  for (let r = centre; rings.length < count; r = rings[rings.length - 1].to) rings.push(nextRing(span, r));
+  return { centre, rings };
 }
 
-function polar(box: Box, area: number, M: number, g: number): Raw | null {
-  const P = M * g;
-  const rmax = Math.min(box.hw, box.hh);
-  const J = Math.floor(Math.PI * rmax * rmax / (P * area) + 1e-9);
-  if (J < 1) return null;
-  const rings = polarRings(M, g, J);
-  const rad = (B: number) => Math.sqrt(B * area / Math.PI);
+/** The ring from radius r: the allowed count giving the squarest larger cells (depth : width nearest 1). */
+function nextRing(span: number, r: number): PolarRing {
+  let best: PolarRing | null = null, bestQ = Infinity;
+  for (const n of RING_COUNTS) {
+    const to = Math.sqrt(r * r + 2 * n / span);  // the ring holds n larger cells
+    const q = Math.abs(Math.log((to - r) / (span * (r + to) / 2 / n)));
+    if (q < bestQ - 1e-12) { best = { from: r, to, sectors: n }; bestQ = q; }
+    else if (q > bestQ) break;  // depth : width grows with n
+  }
+  return best!;
+}
 
-  const minorCircles = rings.filter((ring) => ring.to % P !== 0).map((ring) => rad(ring.to));
-  const majorCircles = Array.from({ length: J }, (_, j) => rad((j + 1) * P));
+/**
+ * Where the centre goes and the angle of the first straight edge. The circle is centred; a half
+ * and a third lie with a straight edge along the side of the page that holds the larger one,
+ * a quarter in the bottom left corner. Angles run clockwise on the page (y points down).
+ */
+function polarPlace(box: Box, part: number): { cx: number; cy: number; a0: number } {
+  const { hw, hh } = box;
+  if (part === 4) return { cx: -hw, cy: hh, a0: -Math.PI / 2 };
+  if (part === 2) {
+    return Math.min(2 * hw, hh) >= Math.min(hw, 2 * hh)
+      ? { cx: -hw, cy: 0, a0: -Math.PI / 2 }    // straight edge on the left
+      : { cx: 0, cy: hh, a0: -Math.PI };        // straight edge at the bottom
+  }
+  if (part === 3) {
+    // The sector is 1.5 R along its straight edge and R across.
+    const along = Math.min(2 * hw, 4 * hh / 3), across = Math.min(4 * hw / 3, 2 * hh);
+    return along >= across
+      ? { cx: -hw, cy: along / 4, a0: -Math.PI / 2 }     // edge on the left, from the apex up
+      : { cx: -across / 4, cy: hh, a0: -2 * Math.PI / 3 };  // edge at the bottom, from the apex right
+  }
+  return { cx: 0, cy: 0, a0: -Math.PI / 2 };
+}
 
-  // Spokes by exact angle (a/n in lowest terms), joined across rings with the same angle.
-  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-  const spokes = new Map<string, { angle: number; parts: [number, number][] }>();
-  for (const ring of rings) {
-    for (let a = 0; a < ring.sectors; a++) {
-      if ((a * M) % ring.sectors === 0) continue;  // a major spoke
-      const d = gcd(a, ring.sectors);
-      const id = `${a / d}/${ring.sectors / d}`;
-      let spoke = spokes.get(id);
-      if (!spoke) spokes.set(id, (spoke = { angle: 2 * Math.PI * a / ring.sectors, parts: [] }));
-      const last = spoke.parts[spoke.parts.length - 1];
-      if (last && last[1] === ring.from) last[1] = ring.to; else spoke.parts.push([ring.from, ring.to]);
+/**
+ * The polar grid: a field in the centre, then rings of near-square larger cells, each of k × k
+ * small ones (k along the arc; the k rings inside cut it into equal areas, so every small cell has
+ * the chosen area). The field in the centre stays whole. Beyond the last whole ring, larger cells
+ * that fit on the page are drawn too, as long as they touch a drawn cell of the ring inside and
+ * a neighbour in their own ring.
+ */
+function polarGrid(box: Box, area: number, k: number, part: number) {
+  const side = Math.sqrt(k * k * area);
+  const span = 2 * Math.PI / part, whole = part === 1;
+  const { cx, cy, a0 } = polarPlace(box, part);
+  const angle = (f: number) => a0 + span * f;  // f: fraction of the span
+  const inside = (r: number, t: number) => {
+    const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
+    return Math.abs(x) <= box.hw + EPS && Math.abs(y) <= box.hh + EPS;
+  };
+  // Points bounding a piece of a ring: its corners and the outer arc where it crosses an axis.
+  const outline = (r1: number, r2: number, f1: number, f2: number) => {
+    const t1 = angle(f1), t2 = angle(f2);
+    const pts: [number, number][] = [[r2, t1], [r2, t2]];
+    if (r1 > 0) pts.push([r1, t1], [r1, t2]); else pts.push([0, 0]);
+    for (let q = Math.ceil(t1 / (Math.PI / 2) + 1e-9); q * Math.PI / 2 < t2 - 1e-9; q++) pts.push([r2, q * Math.PI / 2]);
+    return pts;
+  };
+  const fits = (pts: [number, number][]) => pts.every(([r, t]) => inside(r, t));
+
+  const r0 = polarRings(part, 0).centre * side;
+  const centrePts = outline(whole ? r0 : 0, r0, 0, 1).concat(whole ? [[r0, 0], [r0, Math.PI / 2], [r0, Math.PI], [r0, -Math.PI / 2]] : []);
+  if (!fits(centrePts)) return null;
+
+  // Rings while any cell of one still fits and touches the ring inside.
+  const reach = Math.hypot(2 * box.hw, 2 * box.hh);
+  const rings: PolarRing[] = [];
+  const kept: Uint8Array[] = [];
+  for (let i = 0; ; i++) {
+    const ring = nextRing(span, i > 0 ? rings[i - 1].to : r0 / side);
+    if (ring.from * side > reach) break;
+    const n = ring.sectors, keep = new Uint8Array(n);
+    const prev = kept[i - 1], pn = i > 0 ? rings[i - 1].sectors : 0;
+    for (let j = 0; j < n; j++) {
+      let touches = i === 0;
+      for (let q = Math.floor(j * pn / n); !touches && q < Math.ceil((j + 1) * pn / n - 1e-9); q++) touches = prev[q] === 1;
+      if (touches && fits(outline(ring.from * side, ring.to * side, j / n, (j + 1) / n))) keep[j] = 1;
     }
+    // A cell with no neighbour in its ring would stick out alone like a tooth: left off.
+    const on = (j: number) => (whole ? keep[(j + n) % n] : j >= 0 && j < n ? keep[j] : 0) === 1;
+    const lone = Array.from({ length: n }, (_, j) => on(j) && !on(j - 1) && !on(j + 1));
+    lone.forEach((l, j) => { if (l && n > 1) keep[j] = 0; });
+    const any = keep.some((v) => v === 1);
+    if (!any) break;
+    rings.push(ring); kept.push(keep);
   }
-  const minor: Seg[] = [];
-  for (const { angle, parts } of spokes.values()) {
-    const c = Math.cos(angle), s = Math.sin(angle);
-    for (const [b0, b1] of parts) minor.push([rad(b0) * c, rad(b0) * s, rad(b1) * c, rad(b1) * s]);
-  }
-  const outer = rad(J * P);
-  const major: Seg[] = Array.from({ length: M }, (_, a) => {
-    const angle = 2 * Math.PI * a / M;
-    return [0, 0, outer * Math.cos(angle), outer * Math.sin(angle)] as Seg;
+
+  // Extent of the drawing, then everything moves so that it is centred on the page.
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const extend = (pts: [number, number][]) => {
+    for (const [r, t] of pts) {
+      const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    }
+  };
+  extend(centrePts);
+  rings.forEach((ring, i) => kept[i].forEach((on, j) => {
+    if (on) extend(outline(ring.from * side, ring.to * side, j / ring.sectors, (j + 1) / ring.sectors));
+  }));
+  const ox = cx - (x0 + x1) / 2, oy = cy - (y0 + y1) / 2;
+  const at = (r: number, f: number) => `${fmt(ox + r * Math.cos(angle(f)))} ${fmt(oy + r * Math.sin(angle(f)))}`;
+
+  // Arcs: unions of fractions [f1, f2] at a radius; a whole circle is two halves.
+  const arcPath = (r: number, spans: [number, number][]) => {
+    spans.sort((p, q) => p[0] - q[0]);
+    const runs: [number, number][] = [];
+    for (const [f1, f2] of spans) {
+      const last = runs[runs.length - 1];
+      if (last && f1 <= last[1] + 1e-9) last[1] = Math.max(last[1], f2); else runs.push([f1, f2]);
+    }
+    if (whole && runs.length > 1 && runs[0][0] < 1e-9 && runs[runs.length - 1][1] > 1 - 1e-9) {
+      runs[0][0] = runs.pop()![0] - 1;  // joins across the first spoke
+    }
+    const R = fmt(r);
+    return runs.map(([f1, f2]) => {
+      const pieces = Math.ceil((f2 - f1) * span / (Math.PI * 0.9) - 1e-9);
+      let d = `M${at(r, f1)}`;
+      for (let p = 1; p <= pieces; p++) d += `A${R} ${R} 0 0 1 ${at(r, f1 + (f2 - f1) * p / pieces)}`;
+      return d;
+    }).join('');
+  };
+  // Spokes: radial pieces by exact angle (a fraction in lowest terms), joined where they meet.
+  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+  const spokeMap = () => new Map<string, { f: number; parts: [number, number][] }>();
+  const addSpoke = (map: ReturnType<typeof spokeMap>, a: number, b: number, r1: number, r2: number) => {
+    if (whole) a %= b;
+    const d = gcd(a, b) || 1, id = `${a / d}/${b / d}`;
+    let spoke = map.get(id);
+    if (!spoke) map.set(id, (spoke = { f: a / b, parts: [] }));
+    spoke.parts.push([r1, r2]);
+  };
+  const spokePath = (map: ReturnType<typeof spokeMap>) => {
+    let d = '';
+    for (const { f, parts } of map.values()) {
+      parts.sort((p, q) => p[0] - q[0]);
+      const runs: [number, number][] = [];
+      for (const [r1, r2] of parts) {
+        const last = runs[runs.length - 1];
+        if (last && r1 <= last[1] + 1e-9) last[1] = Math.max(last[1], r2); else runs.push([r1, r2]);
+      }
+      for (const [r1, r2] of runs) d += `M${at(r1, f)}L${at(r2, f)}`;
+    }
+    return d;
+  };
+
+  const majorSpokes = spokeMap(), minorSpokes = spokeMap();
+  let major = '', minor = '';
+  if (!whole) { addSpoke(majorSpokes, 0, 1, 0, r0); addSpoke(majorSpokes, 1, 1, 0, r0); }
+  let inner: [number, number][] = [[0, 1]];  // outer edges of the ring inside (the centre: all of it)
+  let r = r0;
+  let majors = 1;
+  rings.forEach((ring, i) => {
+    const n = ring.sectors, keep = kept[i];
+    const r1 = ring.from * side, r2 = ring.to * side;
+    const cells: [number, number][] = [];
+    keep.forEach((on, j) => { if (on) cells.push([j / n, (j + 1) / n]); });
+    majors += cells.length;
+    major += arcPath(r, inner.concat(cells.map((c) => [...c] as [number, number])));
+    for (let e = 0; e <= n; e++) {
+      if (whole && e === n) break;
+      const left = whole ? keep[(e + n - 1) % n] : e > 0 ? keep[e - 1] : 0;
+      if (left || (e < n && keep[e])) addSpoke(majorSpokes, e, n, r1, r2);
+    }
+    for (let m = 1; m < k; m++) minor += arcPath(Math.sqrt(r1 * r1 + m / k * (r2 * r2 - r1 * r1)), cells.map((c) => [...c] as [number, number]));
+    keep.forEach((on, j) => {
+      if (on) for (let m = 1; m < k; m++) addSpoke(minorSpokes, j * k + m, n * k, r1, r2);
+    });
+    inner = cells; r = r2;
   });
+  major += arcPath(r, inner.map((c) => [...c] as [number, number]));
+  major += spokePath(majorSpokes);
+  minor += spokePath(minorSpokes);
+  const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
   return {
-    minor, major, minorCircles, majorCircles,
-    majors: J * M, cells: J * P, perMajor: g,
-    rings: mergeZones(rings).map((z) => ({ from: rad(z.from), to: rad(z.to), sectors: z.sectors })),
+    minor, major, majors, cells: majors * k * k,
+    rings: rings.map((ring) => ({ from: ring.from * side, to: ring.to * side, sectors: ring.sectors })),
+    centre: r0, extent: [-hx, -hy, hx, hy] as [number, number, number, number],
   };
-}
-
-/**
- * The polar grid on a third of the circle (120°). Rings and spokes as on a circle with three
- * times as many larger cells, so the zones follow the same rule. One straight edge runs along
- * the long side of the page: the sector is 1.5 R long that way and R across, which fits nearly
- * the largest sector a sheet can hold (the best tilt gains about 1.5% and looks crooked).
- */
-function polarThird(box: Box, area: number, M: number, g: number): Raw | null {
-  const span = 2 * Math.PI / 3;
-  const along = Math.min(2 * box.hw, 2 * box.hh / 1.5);   // straight edge vertical
-  const across = Math.min(2 * box.hw / 1.5, 2 * box.hh);  // straight edge horizontal
-  const a0 = along >= across ? -Math.PI / 2 : -2 * Math.PI / 3;
-  const rmax = Math.max(along, across);
-  const P = 3 * M * g;  // cells in a larger ring of the whole circle; a third of them is drawn
-  const J = Math.floor(Math.PI * rmax * rmax / (P * area) + 1e-9);
-  if (J < 1) return null;
-  const rings = polarRings(3 * M, g, J);
-  const rad = (B: number) => Math.sqrt(B * area / Math.PI);
-  const at = (r: number, angle: number): [number, number] => [r * Math.cos(angle), r * Math.sin(angle)];
-
-  const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
-  const spokes = new Map<string, { angle: number; parts: [number, number][] }>();
-  for (const ring of rings) {
-    const n = ring.sectors / 3;
-    for (let a = 1; a < n; a++) {
-      if ((a * M) % n === 0) continue;  // a major spoke
-      const d = gcd(a, n);
-      const id = `${a / d}/${n / d}`;
-      let spoke = spokes.get(id);
-      if (!spoke) spokes.set(id, (spoke = { angle: a0 + span * a / n, parts: [] }));
-      const last = spoke.parts[spoke.parts.length - 1];
-      if (last && last[1] === ring.from) last[1] = ring.to; else spoke.parts.push([ring.from, ring.to]);
-    }
-  }
-  const minor: Seg[] = [];
-  for (const { angle, parts } of spokes.values()) {
-    for (const [b0, b1] of parts) minor.push([...at(rad(b0), angle), ...at(rad(b1), angle)]);
-  }
-  const outer = rad(J * P);
-  const major: Seg[] = Array.from({ length: M + 1 }, (_, a) => [0, 0, ...at(outer, a0 + span * a / M)] as Seg);
-  return {
-    minor, major,
-    arcs: {
-      minor: rings.filter((ring) => ring.to % P !== 0).map((ring) => rad(ring.to)),
-      major: Array.from({ length: J }, (_, j) => rad((j + 1) * P)),
-      a0, span,
-    },
-    majors: J * M, cells: J * M * g, perMajor: g,
-    rings: mergeZones(rings).map((z) => ({ from: rad(z.from), to: rad(z.to), sectors: z.sectors / 3 })),
-  };
-}
-
-function mergeZones(rings: { from: number; to: number; sectors: number }[]) {
-  const zones: typeof rings = [];
-  for (const ring of rings) {
-    const last = zones[zones.length - 1];
-    if (last && last.sectors === ring.sectors) last.to = ring.to; else zones.push({ ...ring });
-  }
-  return zones;
 }
 
 /** Side of a small cell in mm (square, tri, hex), width and height (rect); polar: side of a square of that area. */
@@ -805,38 +850,42 @@ const GRID_NAMES: Record<GridType, string> = {
   kagome: 'kagome',
   square: 'square', rect: 'rectangular', tri: 'triangular', hex: 'hexagonal', polar: 'polar',
 };
+// The polar grid on a part of the circle.
+const PART_NAMES: Record<number, string> = { 1: 'polar', 2: 'semicircle', 3: 'sector', 4: 'quadrant' };
 
 export function buildGrid(s: Settings): Grid {
   const paper = PAPERS[s.paper];
   const width = s.landscape ? paper.height : paper.width;
   const height = s.landscape ? paper.width : paper.height;
   const box: Box = { hw: width / 2 - s.margin, hh: height / 2 - s.margin };
-  // A turned grid is built for the page turned sideways, then rotated back.
-  const frame = box;
 
-  let raw: Raw | null = null;
-  if (s.grid === 'square') raw = squareLike(frame, Math.sqrt(s.area), Math.sqrt(s.area), s.group);
-  else if (s.grid === 'rect') {
-    // Sides 1 : √2, like an A sheet; tall cells unless turned.
-    raw = squareLike(frame, Math.sqrt(s.area / Math.SQRT2), Math.sqrt(s.area * Math.SQRT2), s.group);
-  } else if (s.grid === 'tri') raw = triangular(frame, s.area, s.group);
-  else if (s.grid === 'hex') raw = hexagonal(frame, s.area, s.group);
-  else if (s.grid === 'kagome') raw = kagome(frame, s.area, s.group);
-  else if (s.part === 3) raw = polarThird(frame, s.area, s.sectors, s.group);
-  else raw = polar(frame, s.area, s.sectors, s.group);
-
-  const perMajor = s.grid === 'polar' ? s.group : s.group * s.group;
-  const kind = s.grid === 'polar' && s.part === 3 ? 'sector' : GRID_NAMES[s.grid];
+  const perMajor = s.group * s.group;
+  const kind = s.grid === 'polar' ? PART_NAMES[s.part] : GRID_NAMES[s.grid];
   const name = (majors: number) => `${kind}_grid_${majors}x${perMajor}x${areaLabel(s.area)}mm2`;
-  if (!raw) {
+  const none: Grid = {
+    width, height, minor: '', major: '', name: name(0), majors: 0, cells: 0, perMajor,
+    cell: cellSides(s), extent: [0, 0, 0, 0], fits: false,
+  };
+
+  if (s.grid === 'polar') {
+    const p = polarGrid(box, s.area, s.group, s.part);
+    if (!p) return none;
     return {
-      width, height, minor: '', major: '', name: name(0), majors: 0, cells: 0, perMajor,
-      cell: cellSides(s), extent: [0, 0, 0, 0], fits: false,
+      width, height, minor: p.minor, major: p.major, name: name(p.majors), majors: p.majors, cells: p.cells,
+      perMajor, cell: cellSides(s), rings: p.rings, extent: p.extent, fits: true,
     };
   }
 
-  // Centre the drawing on the page (placements of triangles and hexagons need not be symmetric),
-  // then rotate a turned grid back: (x, y) → (−y, x).
+  let raw: Raw | null = null;
+  if (s.grid === 'square') raw = squareLike(box, Math.sqrt(s.area), Math.sqrt(s.area), s.group);
+  // Sides 1 : √2, like an A sheet; turning the page gives wide cells.
+  else if (s.grid === 'rect') raw = squareLike(box, Math.sqrt(s.area / Math.SQRT2), Math.sqrt(s.area * Math.SQRT2), s.group);
+  else if (s.grid === 'tri') raw = triangular(box, s.area, s.group);
+  else if (s.grid === 'hex') raw = hexagonal(box, s.area, s.group);
+  else raw = kagome(box, s.area, s.group);
+  if (!raw) return none;
+
+  // Centre the drawing on the page (placements of triangles and hexagons need not be symmetric).
   const polys = (raw.chained ? raw.minor.concat(raw.major) : (raw.minor as Seg[]).concat(raw.major as Seg[])) as number[][];
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   for (const pts of polys) {
@@ -845,46 +894,19 @@ export function buildGrid(s: Settings): Grid {
       y0 = Math.min(y0, pts[i + 1]); y1 = Math.max(y1, pts[i + 1]);
     }
   }
-  if (raw.majorCircles?.length) {
-    const r = Math.max(...raw.majorCircles);
-    x0 = Math.min(x0, -r); x1 = Math.max(x1, r); y0 = Math.min(y0, -r); y1 = Math.max(y1, r);
-  }
-  if (raw.arcs?.major.length) {
-    // The outer arc reaches furthest where it crosses an axis.
-    const { a0, span } = raw.arcs;
-    const r = Math.max(...raw.arcs.major);
-    for (let q = Math.ceil(a0 / (Math.PI / 2) - 1e-9); q * Math.PI / 2 <= a0 + span + 1e-9; q++) {
-      const x = r * Math.cos(q * Math.PI / 2), y = r * Math.sin(q * Math.PI / 2);
-      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
-    }
-  }
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   const place = (pts: number[]) => {
     const out = new Array<number>(pts.length);
-    for (let i = 0; i < pts.length; i += 2) {
-      const x = pts[i] - cx, y = pts[i + 1] - cy;
-      out[i] = x; out[i + 1] = y;
-    }
+    for (let i = 0; i < pts.length; i += 2) { out[i] = pts[i] - cx; out[i + 1] = pts[i + 1] - cy; }
     return out;
   };
   const draw = (lines: number[][]) => (raw!.chained ? polyPath(lines.map(place)) : segPath(lines.map(place) as Seg[]));
-  const arcs = (radii: number[] = []) => {
-    if (!raw!.arcs) return '';
-    const { a0, span } = raw!.arcs;
-    return radii.map((r) => {
-      const [xa, ya] = place([r * Math.cos(a0), r * Math.sin(a0)]);
-      const [xb, yb] = place([r * Math.cos(a0 + span), r * Math.sin(a0 + span)]);
-      return `M${fmt(xa)} ${fmt(ya)}A${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(xb)} ${fmt(yb)}`;
-    }).join('');
-  };
-  const minor = draw(raw.minor as number[][]) + circlePath(raw.minorCircles ?? []) + arcs(raw.arcs?.minor);
-  const major = draw(raw.major as number[][]) + circlePath(raw.majorCircles ?? []) + arcs(raw.arcs?.major);
   const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
-  const extent: Grid['extent'] = [-hx, -hy, hx, hy];
 
   return {
-    width, height, minor, major, name: name(raw.majors), majors: raw.majors, cells: raw.cells,
-    perMajor: raw.perMajor, cell: cellSides(s), rings: raw.rings, extent, fits: true,
+    width, height, minor: draw(raw.minor as number[][]), major: draw(raw.major as number[][]),
+    name: name(raw.majors), majors: raw.majors, cells: raw.cells,
+    perMajor: raw.perMajor, cell: cellSides(s), extent: [-hx, -hy, hx, hy], fits: true,
   };
 }
 
