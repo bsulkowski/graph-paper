@@ -45,17 +45,20 @@ The polar grid is **experimental**: its drawing and link parameters may still ch
 
 The polar grid has a field in the centre, left whole, and rings of larger cells around it.
 Every larger cell has the area of the centre field, and each ring takes as many of them as
-makes them closest to squares, out of 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60, 90,
-120, 150 … (the divisors of 120, then multiples of 30), so the spokes fall at simple angles.
-Around the whole circle the rings hold 6, 12, 20, 24, 30, 40, 40, 60 … larger cells at every
-size; the size only decides how many rings fit. A larger cell is split into *k* × *k* small
+makes them closest to squares, out of [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
+rounded to whole ones: 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32, 40, 50, 64, 80, 100, 125 …
+Steps of about a quarter keep every ring close to square. Around the whole circle the rings
+hold 6, 12, 20, 25, 32, 40, 40, 50 … larger cells at every size; the size only decides how many
+rings fit. A larger cell is split into *k* × *k* small
 ones — *k* along the arc and *k* rings of equal area across — so every small cell has the
 chosen area. Beyond the last whole ring the larger cells that fit on the page are drawn too,
 as long as they touch a cell of the ring inside and have a neighbour in their own ring.
 
 The polar grid can also be drawn on half, a third or a quarter of the circle: a half and a
-third with a straight edge along the long side of the page, a quarter in a corner. The count in
-a ring is then along the arc of that part. A part suits diagrams that widen from one point,
+third with a straight edge along the long side of the page, a quarter in a corner. The field in
+the centre is that part of the circle's centre, and the count in a ring is along the arc of the
+part, so a part starts as a slice of the whole circle (a half: 3, 6, 10 … where the circle has
+6, 12, 20 …). A part suits diagrams that widen from one point,
 such as a fan chart of ancestors, and a single sheet rolls into a cone.
 
 The area is chosen from [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
@@ -102,6 +105,8 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.6** — the polar grid: counts in a ring from Human Scale Numbers; on a part of the circle
+  the centre field is that part of the circle's.
 - **1.5** — the polar grid anew: a whole field in the centre, rings of near-square larger cells
   of *k* × *k* small ones (`group` is *k* now, `sectors` from an older link is ignored); also on
   half and a quarter of the circle (`part=2`, `part=4`).

@@ -46,18 +46,20 @@ Siatka biegunowa jest **eksperymentalna**: jej rysunek i parametry linku mogą s
 
 Siatka biegunowa ma w środku jedno pole, niepodzielone, a wokół niego pierścienie dużych pól.
 Każde duże pole ma tyle miejsca co pole w środku, a każdy pierścień dostaje ich tyle, żeby
-były jak najbliższe kwadratom — spośród 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60, 90,
-120, 150 … (dzielniki 120, potem wielokrotności 30), więc promienie wypadają pod prostymi
-kątami. Wokół całego koła pierścienie mają 6, 12, 20, 24, 30, 40, 40, 60 … dużych pól przy
-każdej wielkości; wielkość decyduje tylko o tym, ile pierścieni się zmieści. Duże pole dzieli się
+były jak najbliższe kwadratom — spośród [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
+zaokrąglonych do całości: 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32, 40, 50, 64, 80, 100, 125 …
+Kroki o mniej więcej ćwierć trzymają każdy pierścień blisko kwadratu. Wokół całego koła
+pierścienie mają 6, 12, 20, 25, 32, 40, 40, 50 … dużych pól przy każdej wielkości; wielkość decyduje tylko o tym, ile pierścieni się zmieści. Duże pole dzieli się
 na *k* × *k* małych — *k* wzdłuż łuku i *k* pierścieni o równym polu w poprzek — więc każda
 mała komórka ma wybrane pole. Za ostatnim pełnym pierścieniem rysują się jeszcze duże pola,
 które mieszczą się na kartce, o ile stykają się z polem pierścienia pod spodem i mają sąsiada
 we własnym pierścieniu.
 
 Siatkę biegunową można też narysować na połowie, jednej trzeciej albo ćwiartce koła: połowę
-i jedną trzecią prostym bokiem wzdłuż dłuższej krawędzi kartki, ćwiartkę w rogu. Liczba dużych
-pól w pierścieniu dotyczy wtedy łuku tej części. Część koła pasuje do diagramów, które
+i jedną trzecią prostym bokiem wzdłuż dłuższej krawędzi kartki, ćwiartkę w rogu. Pole w środku
+jest wtedy taką samą częścią pola w środku koła, a liczba dużych pól w pierścieniu dotyczy łuku
+tej części — część zaczyna się więc jak wycinek całego koła (połowa: 3, 6, 10 …, gdzie koło ma
+6, 12, 20 …). Część koła pasuje do diagramów, które
 rozszerzają się od jednego punktu, jak wachlarz przodków, a pojedynczą kartkę da się zwinąć
 w stożek.
 
@@ -85,6 +87,8 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.6** — siatka biegunowa: liczby pól w pierścieniu z Human Scale Numbers; na części koła
+  pole w środku jest taką samą częścią środka koła.
 - **1.5** — siatka biegunowa od nowa: w środku całe pole, wokół pierścienie dużych pól bliskich
   kwadratom, każde z *k* × *k* małych (`group` to teraz *k*, `sectors` ze starszego linku
   jest pomijane); także na połowie i ćwiartce koła (`part=2`, `part=4`).

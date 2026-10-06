@@ -49,24 +49,28 @@ test('old A4 sheets that fill the page come out the same', () => {
   for (const [name, s] of same) assert.equal(sheet(s).name, name);
 });
 
-const ALLOWED = new Set([2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]);
-const allowed = (n: number) => ALLOWED.has(n) || (n >= 60 && n % 30 === 0);
+// Human Scale Numbers rounded to whole ones: 3.2 → 3, 6.4 → 6, 12.5 → 12.
+const ALLOWED = new Set([2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32, 40, 50, 64, 80, 100, 125, 160, 200, 250, 320, 400, 500, 640, 800]);
+const allowed = (n: number) => ALLOWED.has(n);
 
 test('polar rings: the same sequence at every size, squarest allowed counts', () => {
-  assert.equal(polarRings(1, 12).rings.map((r) => r.sectors).join(' '), '6 12 20 24 30 40 40 60 60 60 60 90');
+  assert.equal(polarRings(1, 12).rings.map((r) => r.sectors).join(' '), '6 12 20 25 32 40 40 50 50 64 64 80');
+  // A part starts as a slice of the circle: half of 6, 12, 20 and a third of 6, 12.
+  assert.equal(polarRings(2, 3).rings.map((r) => r.sectors).join(' '), '3 6 10');
+  assert.equal(polarRings(3, 2).rings.map((r) => r.sectors).join(' '), '2 4');
   for (const part of PARTS) {
     const span = 2 * Math.PI / part;
     const { centre, rings } = polarRings(part, 60);
-    // The centre field and every larger cell have the same area (1 in these units).
-    assert.ok(Math.abs(span / 2 * centre ** 2 - 1) < 1e-9);
+    // Every larger cell has area 1 in these units; the centre of the circle too, a part its share.
+    assert.ok(Math.abs(span / 2 * centre ** 2 - 1 / part) < 1e-9);
     let r = centre;
     for (const ring of rings) {
       assert.ok(allowed(ring.sectors), `${part}: ${ring.sectors} is not allowed`);
       assert.ok(Math.abs(ring.from - r) < 1e-12);
       assert.ok(Math.abs(span / 2 * (ring.to ** 2 - ring.from ** 2) - ring.sectors) < 1e-9);
-      // Depth : width stays near square; the jumps 40 → 60 → 90 cost the most.
+      // Depth : width stays near square: the counts grow by about ×1.25.
       const q = (ring.to - ring.from) / (span * (ring.from + ring.to) / 2 / ring.sectors);
-      assert.ok(q > 0.66 && q < 1.5, `${part}: ring of ${ring.sectors} at ${ring.from.toFixed(1)} is ${q.toFixed(2)}`);
+      assert.ok(q > 0.78 && q < 1.28, `${part}: ring of ${ring.sectors} at ${ring.from.toFixed(1)} is ${q.toFixed(2)}`);
       r = ring.to;
     }
   }
@@ -79,7 +83,8 @@ test('polar rings: the same sequence at every size, squarest allowed counts', ()
       assert.equal(ring.sectors, seq[i].sectors);
       assert.ok(Math.abs(span / 2 * (ring.to ** 2 - ring.from ** 2) / ring.sectors - k * k * area(a)) < 1e-6);
     });
-    assert.equal(g.cells, g.majors * k * k);
+    // The centre is one field: its share of a larger cell, counted in small cells.
+    assert.equal(g.cells, (g.majors - 1) * k * k + Math.max(1, Math.round(k * k / part)));
   }
 });
 

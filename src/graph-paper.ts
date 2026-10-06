@@ -11,7 +11,7 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.5';
+export const TOOL_VERSION = '1.6';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
@@ -626,23 +626,26 @@ function kagome(box: Box, area: number, k: number): Raw | null {
 // ---------------------------------------------------------------------------------------------
 // Polar grid
 
-// Larger cells allowed in a ring (along the arc of a half, third or quarter): the divisors of 120
-// up to 60, then multiples of 30 — spokes at simple angles, many of them shared between rings.
-const RING_COUNTS: number[] = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]
-  .concat(Array.from({ length: 98 }, (_, i) => 90 + 30 * i));
+// Larger cells allowed in a ring (along the arc of a half, third or quarter): Human Scale Numbers
+// rounded to whole ones — 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 32, 40, 50, 64, 80, 100, 125 …
+// (3.2 → 3, 6.4 → 6, 12.5 → 12). Steps of about ×1.25 keep every ring close to square.
+const RING_COUNTS: number[] = [...new Set([1, 10, 100, 1000].flatMap((m) =>
+  HSN.map((v) => (v * m === 12.5 ? 12 : Math.round(v * m)))))].filter((n) => n >= 2);
 
 export interface PolarRing { from: number; to: number; sectors: number }
 
 /**
  * Rings of the polar grid on a circle (part 1) or its half, third or quarter. Radii in units of
- * the side of a square as large as one larger cell: every larger cell has that area, the field in
- * the centre too. Each ring takes the allowed count of larger cells along its arc that makes them
- * squarest, so the sequence never depends on the size — the size only decides how many rings fit.
- * Around a whole circle: 6, 12, 20, 24, 30, 40, 40, 60, 60, 60, 60, 90, …
+ * the side of a square as large as one larger cell: every larger cell has that area, and so has
+ * the field in the centre of the whole circle; a part keeps its share of that field, so the centre
+ * has the same radius everywhere and a part starts as a slice of the circle. Each ring takes the
+ * allowed count of larger cells along its arc that makes them squarest, so the sequence never
+ * depends on the size — the size only decides how many rings fit.
+ * Around a whole circle: 6, 12, 20, 25, 32, 40, 40, 50, 50, 64, 64, 80, …
  */
 export function polarRings(part: number, count: number): { centre: number; rings: PolarRing[] } {
   const span = 2 * Math.PI / part;
-  const centre = Math.sqrt(2 / span);  // a sector of the centre: span / 2 · r² = 1
+  const centre = Math.sqrt(1 / Math.PI);  // the centre of the circle: π r² = 1
   const rings: PolarRing[] = [];
   for (let r = centre; rings.length < count; r = rings[rings.length - 1].to) rings.push(nextRing(span, r));
   return { centre, rings };
@@ -710,6 +713,7 @@ function polarGrid(box: Box, area: number, k: number, part: number) {
   const fits = (pts: [number, number][]) => pts.every(([r, t]) => inside(r, t));
 
   const r0 = polarRings(part, 0).centre * side;
+  const centreCells = Math.max(1, Math.round(k * k / part));  // the centre's share, in small cells
   const centrePts = outline(whole ? r0 : 0, r0, 0, 1).concat(whole ? [[r0, 0], [r0, Math.PI / 2], [r0, Math.PI], [r0, -Math.PI / 2]] : []);
   if (!fits(centrePts)) return null;
 
@@ -823,7 +827,7 @@ function polarGrid(box: Box, area: number, k: number, part: number) {
   minor += spokePath(minorSpokes);
   const hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
   return {
-    minor, major, majors, cells: majors * k * k,
+    minor, major, majors, cells: (majors - 1) * k * k + centreCells,
     rings: rings.map((ring) => ({ from: ring.from * side, to: ring.to * side, sectors: ring.sectors })),
     centre: r0, extent: [-hx, -hy, hx, hy] as [number, number, number, number],
   };
