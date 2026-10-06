@@ -18,6 +18,21 @@ import {
 const area = (a: number) => AREAS.reduce((b, x) => (Math.abs(Math.log(x / a)) < Math.abs(Math.log(b / a)) ? x : b));
 const sheet = (s: Partial<Settings>) => buildGrid({ ...DEFAULTS, ...s });
 
+test('cell areas are Human Scale Numbers from 1 mm² to 10 cm²', () => {
+  assert.equal(AREAS.length, 31);
+  assert.deepEqual(AREAS.slice(0, 11), [1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8, 10]);
+  assert.equal(AREAS[AREAS.length - 1], 1000);
+  for (let i = 3; i < AREAS.length; i++) {
+    // Every third step doubles (6.4 → 12.5 is HSN's one rounding).
+    assert.ok(Math.abs(AREAS[i] / AREAS[i - 3] - 2) < 0.05, `${AREAS[i - 3]} → ${AREAS[i]}`);
+  }
+  for (const v of [25, 50, 100]) assert.ok(AREAS.includes(v));
+  // An area from an older link is read as the nearest value.
+  assert.equal(parseSettings(new URLSearchParams('area=35')).area, 32);
+  assert.equal(parseSettings(new URLSearchParams('area=6.25')).area, 6.4);
+  assert.equal(parseSettings(new URLSearchParams('area=800')).area, 800);
+});
+
 test('the default sheet is the first sheet of the old generator', () => {
   assert.equal(buildGrid(DEFAULTS).name, 'square_grid_24x36x50mm2');
 });
@@ -164,17 +179,23 @@ test('the ⅓ sector: name, edge along the page, three of them make the circle',
   assert.ok(wide.extent[2] - wide.extent[0] > wide.extent[3] - wide.extent[1]);
 });
 
-test('kagome: hexagons with triangles, every line straight across', () => {
+test('kagome: hexagons with triangles, whole larger cells, no three lines in a point', () => {
   const g = sheet({ grid: 'kagome', area: area(50), group: 3 });
-  assert.equal(g.name, 'kagome_grid_71x9x50mm2');
+  assert.equal(g.name, 'kagome_grid_78x9x50mm2');
   // The hexagon has the area of the setting, as in the hexagonal grid.
   assert.ok(Math.abs(3 * Math.sqrt(3) / 2 * g.cell.a ** 2 - area(50)) < 1e-9);
-  // Lines run from margin to margin: every segment ends on the edge of the grid area.
-  const hw = g.width / 2 - DEFAULTS.margin, hh = g.height / 2 - DEFAULTS.margin;
-  const segs = (g.minor + g.major).match(/M[^M]+/g)!.map((m) => m.slice(1).split(/[ L]/).map(Number));
-  const onEdge = (x: number, y: number) => Math.abs(Math.abs(x) - hw) < 1e-3 || Math.abs(Math.abs(y) - hh) < 1e-3;
-  for (const [x1, y1, x2, y2] of segs) assert.ok(onEdge(x1, y1) && onEdge(x2, y2), `${x1},${y1} – ${x2},${y2}`);
+  const parse = (d: string) => d.match(/M[^M]+/g)!.map((m) => m.slice(1).split(/[ L]/).map(Number));
+  const minor = parse(g.minor), major = parse(g.major);
+  // Whole larger cells: every thin line ends on a dark one (the outline or a line inside).
+  const onSeg = (x: number, y: number, [ax, ay, bx, by]: number[]) => {
+    const t = ((x - ax) * (bx - ax) + (y - ay) * (by - ay)) / ((bx - ax) ** 2 + (by - ay) ** 2);
+    return t > -1e-6 && t < 1 + 1e-6 && Math.hypot(ax + t * (bx - ax) - x, ay + t * (by - ay) - y) < 1e-3;
+  };
+  for (const [x1, y1, x2, y2] of minor) {
+    for (const [x, y] of [[x1, y1], [x2, y2]]) assert.ok(major.some((m) => onSeg(x, y, m)), `thin line ends off the outline at ${x},${y}`);
+  }
   // No three lines meet in a point (that would be the triangular grid).
+  const segs = minor.concat(major);
   const meet = new Map<string, number>();
   for (let i = 0; i < segs.length; i++) {
     for (let j = i + 1; j < segs.length; j++) {
@@ -190,10 +211,6 @@ test('kagome: hexagons with triangles, every line straight across', () => {
   }
   assert.ok(meet.size > 100);
   for (const [at, pairs] of meet) assert.equal(pairs, 1, `more than two lines meet at ${at}`);
-  // A hexagon sits in the middle of the page: the lines nearest the centre are half a spacing away.
-  const d = g.cell.a * Math.sqrt(3);
-  const horizontal = segs.filter(([, y1, , y2]) => Math.abs(y1 - y2) < 1e-6).map(([, y]) => Math.abs(y));
-  assert.ok(Math.abs(Math.min(...horizontal) - d / 2) < 1e-3);
   // Turned: the hexagons stand on a corner, so one family of lines is vertical.
   const turned = sheet({ grid: 'kagome', area: area(50), group: 3, turn: true });
   assert.ok(/M(-?[\d.]+) (-?[\d.]+)L\1 /.test(turned.minor + turned.major));

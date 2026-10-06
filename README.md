@@ -28,12 +28,12 @@ it shows the scale rather than a group of whole cells.
 
 Kagome (trihexagonal) is the triangular grid with one of its three families of lines moved
 by half the spacing: no three lines meet any more, so every crossing opens into a small
-triangle and hexagons appear between them. Every line runs straight across the page, which
+triangle and hexagons appear between them. Every line runs straight through, which
 makes it good for ornaments and star patterns, weaving and embroidery, and boards where the
 hexagons are spaces and the triangles junctions. The area is that of the hexagon, so the
-hexagons are those of the hexagonal grid at the same setting. Unlike the other grids, the
-lines run from margin to margin and the cells at the edge are cut; the sheet name counts
-whole hexagons.
+hexagons are those of the hexagonal grid at the same setting. As everywhere else the sheet
+holds whole larger cells — the large hexagons that fit and the large triangles beside them —
+so the edge has the notches of their outline.
 
 In the polar grid every cell has the same area, from the centre to the edge. The number of
 sectors grows outward in steps, wherever the cells would otherwise get too wide, and the
@@ -46,8 +46,10 @@ three times as many larger cells, so three sheets put together make one circle a
 across, and a single sheet rolls into a cone. It also suits diagrams that widen from one point,
 such as a fan chart of ancestors, read with the sheet turned.
 
-The area grows by √2 per step, from 6.25 to 800 mm², so every second step doubles it:
-25 mm² is the usual 5 mm square, 100 mm² the 1 cm square.
+The area is chosen from [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
+— 1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8, 10 … — from 1 mm² (millimetre paper) to 10 cm².
+Every third step doubles the area and every tenth multiplies it by ten: 25 mm² is the usual
+5 mm square, 100 mm² the 1 cm square.
 
 ## Sheet names
 
@@ -87,6 +89,8 @@ what was drawn before. The placement of the grid on the page may still improve.
 
 `TOOL_VERSION` follows that: a new option → 1.1, a fix in the drawing → 1.0.1.
 
+- **1.3** — cell areas from Human Scale Numbers, 1 mm² to 10 cm² (an `area` from an older link
+  is read as the nearest value); the kagome grid holds whole larger cells like the others.
 - **1.2** — the kagome grid (`grid=kagome`).
 - **1.1** — the polar grid on a third of the circle (`part=3`).
 - **1.0** — the first version.

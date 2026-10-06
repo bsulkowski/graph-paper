@@ -11,7 +11,7 @@ export type Lang = 'en' | 'pl';
 
 // Shown discreetly under the sheet. The link parameters (see parseSettings) are the promise:
 // an old link keeps meaning the same grid; the drawing details may improve.
-export const TOOL_VERSION = '1.2';
+export const TOOL_VERSION = '1.3';
 
 export type GridType = 'square' | 'rect' | 'tri' | 'hex' | 'kagome' | 'polar';
 export type Paper = 'a4' | 'a5' | 'a3' | 'letter';
@@ -33,9 +33,11 @@ export interface Settings {
 
 export const GRIDS: GridType[] = ['square', 'rect', 'tri', 'hex', 'kagome', 'polar'];
 
-// Cell areas grow by √2: every second step doubles the area, so 25 mm² (5 mm squares)
-// and 100 mm² (1 cm squares) are both on the scale, and so are the sheets of the old generator.
-export const AREAS: number[] = Array.from({ length: 15 }, (_, i) => 25 * 2 ** ((i - 4) / 2));
+// Cell areas follow Human Scale Numbers (github.com/bsulkowski/human-scale-numbers):
+// 1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8, 10, … — every third step doubles, every tenth is ×10.
+// From 1 mm² (millimetre paper) to 1000 mm² (10 cm²); 25 mm² is the 5 mm square, 100 mm² the 1 cm one.
+const HSN = [1, 1.25, 1.6, 2, 2.5, 3.2, 4, 5, 6.4, 8];
+export const AREAS: number[] = [1, 10, 100].flatMap((m) => HSN.map((v) => Number((v * m).toPrecision(4)))).concat(1000);
 
 export const GROUPS: Record<GridType, number[]> = {
   square: [1, 2, 3, 4, 5, 6, 8, 10],
@@ -159,7 +161,7 @@ export const turnable = (grid: GridType) => grid === 'rect' || grid === 'tri' ||
 
 /** Area as written in the sheet name and the link: whole mm², or two digits below 10 (6.3, 8.8). */
 export function areaLabel(area: number): string {
-  return area >= 10 ? String(Math.round(area)) : String(Number(area.toPrecision(2)));
+  return String(Number(area.toPrecision(4)));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -464,57 +466,139 @@ function hexagonal(box: Box, area: number, k: number): Raw | null {
 
 /**
  * Kagome (trihexagonal) grid: regular hexagons with a triangle at each corner, every line
- * running straight across the page. It is three families of parallel lines like the triangular
- * grid, one of them moved by half the spacing, so no three lines meet in a point. The area is
- * that of the hexagon (the same hexagon as in the hexagonal grid); each triangle is a sixth of it.
- * Lines run from margin to margin, so cells at the edge are cut; counts are of whole hexagons.
- * The larger cell: every k-th line (k odd), chosen so the dark lines form a kagome k times as
- * large, centred on the page like the small one, with a hexagon in the middle.
+ * running straight through. It is three families of parallel lines like the triangular grid,
+ * one of them moved by half the spacing, so no three lines meet in a point. The area is that of
+ * the hexagon (the same hexagon as in the hexagonal grid); each triangle is a sixth of it.
+ *
+ * The larger cell is every k-th line (k odd), so the dark lines form a kagome k times as large,
+ * with a small hexagon in the middle of each large one. As in the other grids the sheet holds
+ * whole larger cells: the large hexagons that fit, and the large triangles that fit next to them;
+ * the edge follows their outline. Several placements are tried, the one covering most wins.
  */
 function kagome(box: Box, area: number, k: number): Raw | null {
   const a = Math.sqrt(2 * area / (3 * SQRT3));
+  const A = k * a;
   const d = a * SQRT3;  // spacing of the lines in each family
-  const fitsHex = (cx: number, cy: number, side: number) =>
-    Math.abs(cx) + side <= box.hw + EPS && Math.abs(cy) + SQRT3 / 2 * side <= box.hh + EPS;
-  // Hexagon centres: a triangular lattice with spacing 2·side, one at the origin (flat-topped).
-  const countHexes = (side: number) => {
-    let n = 0;
-    const J = Math.ceil(box.hh / (SQRT3 * side)) + 1;
-    for (let j = -J; j <= J; j++) {
-      const I = Math.ceil(box.hw / (2 * side)) + Math.abs(j) + 1;
-      for (let i = -I; i <= I; i++) if (fitsHex(2 * side * i + side * j, SQRT3 * side * j, side)) n++;
-    }
-    return n;
+  const DIRS = [0, 1, 2, 3, 4, 5].map((j) => [Math.cos(j * Math.PI / 3), Math.sin(j * Math.PI / 3)]);
+  const TRI = [0, 1, 2, 3, 4, 5].map((j) => [Math.cos(Math.PI / 6 + j * Math.PI / 3), Math.sin(Math.PI / 6 + j * Math.PI / 3)]);
+  const inBox = (x: number, y: number) => Math.abs(x) <= box.hw + EPS && Math.abs(y) <= box.hh + EPS;
+  // Flat-topped hexagon of side s at c; a triangle of side s on edge j of a hexagon at c.
+  const hexCorners = (cx: number, cy: number, side: number) => DIRS.map(([x, y]) => [cx + side * x, cy + side * y]);
+  const triCentre = (cx: number, cy: number, side: number, j: number) =>
+    [cx + 2 * side / SQRT3 * TRI[j][0], cy + 2 * side / SQRT3 * TRI[j][1]];
+  const triCorners = (cx: number, cy: number, side: number, j: number) => {
+    // Its far corner points away from the hexagon; the other two are the hexagon's corners j, j+1.
+    const [tx, ty] = triCentre(cx, cy, side, j);
+    return [[cx + side * DIRS[j][0], cy + side * DIRS[j][1]], [cx + side * DIRS[(j + 1) % 6][0], cy + side * DIRS[(j + 1) % 6][1]],
+      [tx + side / SQRT3 * TRI[j][0], ty + side / SQRT3 * TRI[j][1]]];
   };
-  const majors = countHexes(k * a), cells = countHexes(a);
-  if (majors < 1) return null;
 
-  const minor: Seg[] = [], major: Seg[] = [];
-  const reach = Math.hypot(box.hw, box.hh);
-  for (const angle of [Math.PI / 2, Math.PI / 2 + 2 * Math.PI / 3, Math.PI / 2 + 4 * Math.PI / 3]) {
-    const nx = Math.cos(angle), ny = Math.sin(angle);  // normal of the family
-    const tx = -ny, ty = nx;                           // direction of its lines
-    const I = Math.ceil(reach / d) + 1;
-    for (let i = -I; i <= I; i++) {
-      const c = d * (i + 0.5);                         // lines halfway: a hexagon at the origin
-      const px = nx * c, py = ny * c;
-      // Clip the line to the box: the range of t where px + t·tx, py + t·ty stays inside.
-      let t0 = -Infinity, t1 = Infinity;
-      for (const [p, dir, lim] of [[px, tx, box.hw], [py, ty, box.hh]]) {
-        if (Math.abs(dir) < 1e-12) {
-          if (Math.abs(p) > lim) { t0 = 1; t1 = 0; }
-          continue;
+  // Large cells for a placement of the lattice: hexagon centres o + 2A(u, 0) + 2A·v(½, √3/2).
+  const largeCells = (ox: number, oy: number) => {
+    const hexes: [number, number][] = [];
+    const tris = new Map<number, [number, number, number]>();  // key → centre x, y, and hexagon side-index
+    const V = Math.ceil((box.hh + Math.abs(oy)) / (SQRT3 * A)) + 1;
+    for (let v = -V; v <= V; v++) {
+      const U = Math.ceil((box.hw + Math.abs(ox)) / (2 * A)) + Math.abs(v) + 1;
+      for (let u = -U; u <= U; u++) {
+        const cx = ox + 2 * A * u + A * v, cy = oy + SQRT3 * A * v;
+        if (Math.abs(cx) + A > box.hw + EPS || Math.abs(cy) + SQRT3 / 2 * A > box.hh + EPS) continue;
+        hexes.push([cx, cy]);
+        for (let j = 0; j < 6; j++) {
+          const [tx, ty] = triCentre(cx, cy, A, j);
+          const key = pointKey(tx, ty);
+          if (!tris.has(key) && triCorners(cx, cy, A, j).every(([x, y]) => inBox(x, y))) tris.set(key, [tx, ty, j]);
         }
-        const ta = (-lim - p) / dir, tb = (lim - p) / dir;
-        t0 = Math.max(t0, Math.min(ta, tb));
-        t1 = Math.min(t1, Math.max(ta, tb));
       }
-      if (t1 - t0 < 1e-6) continue;
-      const isMajor = k > 1 && mod(i - (k - 1) / 2, k) === 0;
-      (isMajor ? major : minor).push([px + t0 * tx, py + t0 * ty, px + t1 * tx, py + t1 * ty]);
+    }
+    return { hexes, tris };
+  };
+  // Small cells fill the page alike wherever the lattice starts; large ones are worth placing.
+  const placed = bestPlacement(A < 3 ? 1 : A < 6 ? 3 : 8, (pu, pv) => {
+    const ox = 2 * A * pu + A * pv, oy = SQRT3 * A * pv;
+    const cells = largeCells(ox, oy);
+    return { n: cells.hexes.length * 6 + cells.tris.size, keep: { ox, oy, ...cells } };
+  });
+  if (!placed || placed.hexes.length === 0) return null;
+  const { ox, oy, hexes, tris } = placed;
+
+  // Is a point inside one of the chosen large cells? Its nearest large-hexagon centre (cube
+  // rounding of lattice coordinates) is either the hexagon it lies in or the one whose
+  // neighbouring triangle holds it.
+  const hexSet = new Set(hexes.map(([x, y]) => pointKey(x, y)));
+  const insideHex = (x: number, y: number, cx: number, cy: number, side: number) => {
+    const dx = Math.abs(x - cx), dy = Math.abs(y - cy);
+    return dy <= SQRT3 / 2 * side + EPS && SQRT3 * dx + dy <= SQRT3 * side + EPS;
+  };
+  const covered = (x: number, y: number) => {
+    const fv = (y - oy) / (SQRT3 * A), fu = (x - ox - A * fv) / (2 * A), fw = -fu - fv;
+    let u = Math.round(fu), v = Math.round(fv);
+    const w = Math.round(fw);
+    const du = Math.abs(u - fu), dv = Math.abs(v - fv), dw = Math.abs(w - fw);
+    if (du > dv && du > dw) u = -v - w; else if (dv > dw) v = -u - w;
+    const cx = ox + 2 * A * u + A * v, cy = oy + SQRT3 * A * v;
+    if (insideHex(x, y, cx, cy, A)) return hexSet.has(pointKey(cx, cy));
+    const j = mod(Math.round((Math.atan2(y - cy, x - cx) - Math.PI / 6) / (Math.PI / 3)), 6);
+    const [tx, ty] = triCentre(cx, cy, A, j);
+    return tris.has(pointKey(tx, ty));
+  };
+
+  // Small cells whose centre is covered, collected as pieces of the lines they lie on. Every
+  // small edge lies on one line of one family; pieces on the same line are merged into runs.
+  const fam = [Math.PI / 2, Math.PI / 2 + 2 * Math.PI / 3, Math.PI / 2 + 4 * Math.PI / 3]
+    .map((t) => ({ nx: Math.cos(t), ny: Math.sin(t) }));
+  const pieces = new Map<string, { f: number; i: number; spans: [number, number][] }>();
+  const addEdge = (x1: number, y1: number, x2: number, y2: number) => {
+    const mx = (x1 + x2) / 2 - ox, my = (y1 + y2) / 2 - oy;
+    // The family whose normal is perpendicular to the edge.
+    const f = fam.findIndex(({ nx, ny }) => Math.abs(nx * (x2 - x1) + ny * (y2 - y1)) < 1e-6 * a);
+    const { nx, ny } = fam[f];
+    const i = Math.round((nx * mx + ny * my) / d - 0.5);
+    const t1 = -ny * (x1 - ox) + nx * (y1 - oy), t2 = -ny * (x2 - ox) + nx * (y2 - oy);
+    const id = `${f}:${i}`;
+    let line = pieces.get(id);
+    if (!line) pieces.set(id, (line = { f, i, spans: [] }));
+    line.spans.push(t1 < t2 ? [t1, t2] : [t2, t1]);
+  };
+  let cells = 0;
+  const V = Math.ceil((box.hh + Math.abs(oy)) / (SQRT3 * a)) + 2;
+  for (let v = -V; v <= V; v++) {
+    const U = Math.ceil((box.hw + Math.abs(ox)) / (2 * a)) + Math.abs(v) + 2;
+    for (let u = -U; u <= U; u++) {
+      const cx = ox + 2 * a * u + a * v, cy = oy + SQRT3 * a * v;
+      if (Math.abs(cx) > box.hw + 2 * a || Math.abs(cy) > box.hh + 2 * a) continue;
+      if (covered(cx, cy)) {
+        cells++;
+        const c = hexCorners(cx, cy, a);
+        for (let n = 0; n < 6; n++) addEdge(c[n][0], c[n][1], c[(n + 1) % 6][0], c[(n + 1) % 6][1]);
+      }
+      // Each hexagon owns the triangles on its edges 0 and 1; the rest belong to its neighbours.
+      for (const j of [0, 1]) {
+        const [tx, ty] = triCentre(cx, cy, a, j);
+        if (!covered(tx, ty)) continue;
+        const c = triCorners(cx, cy, a, j);
+        for (let n = 0; n < 3; n++) addEdge(c[n][0], c[n][1], c[(n + 1) % 3][0], c[(n + 1) % 3][1]);
+      }
     }
   }
-  return { minor, major, majors, cells, perMajor: k * k };
+
+  // Lines i ≡ (k−1)/2 (mod k) are the large kagome, which has a hexagon where the small one does.
+  const minor: Seg[] = [], major: Seg[] = [];
+  for (const { f, i, spans } of pieces.values()) {
+    const { nx, ny } = fam[f];
+    const c = d * (i + 0.5);
+    const isMajor = k > 1 && mod(i - (k - 1) / 2, k) === 0;
+    spans.sort((p, q) => p[0] - q[0]);
+    const runs: [number, number][] = [];
+    for (const [t0, t1] of spans) {
+      const last = runs[runs.length - 1];
+      if (last && t0 <= last[1] + 1e-6 * a) last[1] = Math.max(last[1], t1); else runs.push([t0, t1]);
+    }
+    for (const [t0, t1] of runs) {
+      (isMajor ? major : minor).push([ox + nx * c - ny * t0, oy + ny * c + nx * t0, ox + nx * c - ny * t1, oy + ny * c + nx * t1]);
+    }
+  }
+  return { minor, major, majors: hexes.length, cells, perMajor: k * k };
 }
 
 /**

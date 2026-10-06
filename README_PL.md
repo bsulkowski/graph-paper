@@ -30,11 +30,11 @@ komórki: pokazuje skalę, a nie grupę całych komórek.
 Kagome (siatka trójheksagonalna) to siatka trójkątna, w której jedną z trzech rodzin linii
 przesunięto o pół odstępu: żadne trzy linie już się nie spotykają, więc każde skrzyżowanie
 rozchyla się w mały trójkąt, a między trójkątami powstają sześciokąty. Wszystkie linie biegną
-na przestrzał przez całą kartkę, co przydaje się w ornamentach i gwiazdach, plecionkach
+na przestrzał, co przydaje się w ornamentach i gwiazdach, plecionkach
 i haftach oraz na planszach, gdzie sześciokąty są polami, a trójkąty skrzyżowaniami. Pole
 dotyczy sześciokąta, więc przy tym samym ustawieniu sześciokąty są takie jak w siatce
-sześciokątnej. Inaczej niż w pozostałych siatkach linie biegną od marginesu do marginesu,
-a komórki przy brzegu są ucięte; nazwa arkusza liczy całe sześciokąty.
+sześciokątnej. Jak wszędzie, na kartce są całe duże pola — duże sześciokąty, które się
+mieszczą, i duże trójkąty obok nich — więc brzeg ma załamania ich obrysu.
 
 W siatce biegunowej każda komórka ma to samo pole, od środka aż po brzeg. Liczba wycinków
 rośnie na zewnątrz skokami, tam gdzie komórki zrobiłyby się za szerokie, a okręgi i promienie
@@ -47,7 +47,9 @@ z trzy razy większą liczbą dużych pól, więc trzy kartki złożone razem da
 o średnicy około 37 cm, a pojedynczą da się zwinąć w stożek. Pasuje też do diagramów, które
 rozszerzają się od jednego punktu, jak wachlarz przodków — czytany przy obróconej kartce.
 
-Pole rośnie o √2 na krok, od 6,25 do 800 mm², więc co drugi krok się podwaja: 25 mm² to zwykła
+Pole wybiera się z [Human Scale Numbers](https://github.com/bsulkowski/human-scale-numbers)
+— 1; 1,25; 1,6; 2; 2,5; 3,2; 4; 5; 6,4; 8; 10 … — od 1 mm² (papier milimetrowy) do 10 cm².
+Co trzeci krok pole się podwaja, co dziesiąty rośnie dziesięciokrotnie: 25 mm² to zwykła
 kratka 5 mm, 100 mm² — kratka 1 cm.
 
 ## Nazwy arkuszy
@@ -68,6 +70,8 @@ Przykład użycia i opis instalacji są w [README](README.md#using-the-code) po 
 otworzy później tę samą siatkę. Nowa opcja to nowy parametr, którego wartość domyślna rysuje
 to samo co dotąd. Rozmieszczenie siatki na kartce może się jeszcze poprawiać.
 
+- **1.3** — pole komórki ze skali Human Scale Numbers, od 1 mm² do 10 cm² (`area` ze starszego
+  linku czyta się jako najbliższą wartość); siatka kagome z całymi dużymi polami jak pozostałe.
 - **1.2** — siatka kagome (`grid=kagome`).
 - **1.1** — siatka biegunowa na jednej trzeciej koła (`part=3`).
 - **1.0** — pierwsza wersja.

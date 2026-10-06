@@ -7,6 +7,7 @@ import { DEFAULTS, buildGrid, renderSheet, type Settings } from '../src/graph-pa
 const sheets: Partial<Settings>[] = [
   { grid: 'square', area: 50, group: 6 },
   { grid: 'square', area: 25, group: 10 },
+  { grid: 'square', area: 1, group: 10 },
   { grid: 'rect', area: 50, group: 4 },
   { grid: 'tri', area: 25, group: 5 },
   { grid: 'hex', area: 50, group: 4 },
